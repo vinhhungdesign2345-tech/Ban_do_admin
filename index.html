@@ -83,32 +83,24 @@
         }
     }
 
-    // Định dạng diện tích chuẩn 6.546 m²
-    function formatDienTich(val) {
+    // Định dạng diện tích chuẩn và thêm dấu chấm hàng nghìn (VD: 6546 -> 6.546 m²)
+    function formatDienTich(key, val) {
         if (!val) return "";
         var strVal = String(val).trim();
-        if (strVal.includes("/")) {
-            var parts = strVal.split("/");
-            strVal = parts[parts.length - 1];
+        var cleanKey = key.toLowerCase();
+        
+        // Chỉ định dạng nếu tiêu đề chứa từ "diện tích" hoặc "dien tich"
+        if (cleanKey.includes("diện tích") || cleanKey.includes("dien tich")) {
+            if (strVal.includes("/")) {
+                var parts = strVal.split("/");
+                strVal = parts[parts.length - 1];
+            }
+            var num = parseFloat(strVal.replace(/[^0-9.]/g, ''));
+            if (!isNaN(num)) {
+                return new Intl.NumberFormat('vi-VN').format(num) + " m²";
+            }
         }
-        var num = parseFloat(strVal.replace(/[^0-9.]/g, ''));
-        if (isNaN(num)) return val;
-        return new Intl.NumberFormat('vi-VN').format(num) + " m²";
-    }
-
-    // Hàm chuẩn hóa chuỗi để so sánh chính xác tiêu đề không sợ lỗi font UTF-8
-    function slugify(text) {
-        if (!text) return "";
-        return text.toString().toLowerCase()
-            .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, "a")
-            .replace(/[èéẹẻẽêềếệểễ]/g, "e")
-            .replace(/[ìíịỉĩ]/g, "i")
-            .replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, "o")
-            .replace(/[ùúụủũưừứựửữ]/g, "u")
-            .replace(/[ỳýỵỷỹ]/g, "y")
-            .replace(/đ/g, "d")
-            .replace(/\s+/g, "")
-            .replace(/[^a-z0-9]/g, "");
+        return val;
     }
 
     fetch(webAppUrl)
@@ -119,48 +111,18 @@
                 style: { color: "#e74c3c", weight: 1.5, fillColor: "#9b59b6", fillOpacity: 0.4 },
                 onEachFeature: function (feature, layer) {
                     var p = feature.properties;
+                    var popupContent = "<table class='popup-table'>";
                     
-                    // Tạo một bản đồ chứa dữ liệu đã chuẩn hóa khóa (Key)
-                    var cleanProps = {};
-                    for (var rawKey in p) {
-                        cleanProps[slugify(rawKey)] = p[rawKey];
+                    // LẤY TRỰC TIẾP TỪNG HÀNG TIÊU ĐỀ GỐC CỦA FILE XUẤT RA
+                    for (var key in p) {
+                        var displayValue = formatDienTich(key, p[key]);
+                        popupContent += "<tr>" +
+                            "<td><b>" + key + "</b></td>" +
+                            "<td><span class='popup-value' title='" + displayValue + "'>" + displayValue + "</span></td>" +
+                            "</tr>";
                     }
-
-                    // Hàm lấy giá trị an toàn từ khóa đã chuẩn hóa
-                    function val(slugKey) {
-                        return cleanProps[slugKey] !== undefined && cleanProps[slugKey] !== null ? cleanProps[slugKey] : "";
-                    }
-
-                    // Tự động tìm chính xác các trường dựa vào các biến thể ký tự có thể có từ Web App
-                    var idDat = val("iddat") || val("id");
-                    var soTo = val("soto") || val("so");
-                    var soThua = val("sothua") || val("thua");
-                    var dienTichRaw = val("dientich") || val("dt");
-                    var loaiDat = val("loaidat") || val("dat");
-                    var tenChu = val("tenchu") || val("chu");
-                    var soDinhDanh = val("sodinhdanh") || val("dinhdanh");
-                    var soPhatHanh = val("sophathanhthuadat") || val("sophathanh") || val("sophathien");
-                    var ngayTao = val("ngaytao");
-                    var ngayCapNhat = val("ngaycapnhat") || val("capnhat");
-                    var trangThai = val("trangthaithuadat") || val("trangthai") || val("hatthai");
-                    var ghiChu = val("ghichu") || val("ghi");
-
-                    // Ép cố định giao diện cột bên trái chuẩn tiếng Việt 100%
-                    var popupContent = "<table class='popup-table'>" +
-                        "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + idDat + "</span></td></tr>" +
-                        "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + soTo + "</span></td></tr>" +
-                        "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + soThua + "</span></td></tr>" +
-                        "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(dienTichRaw) + "</td></tr>" +
-                        "<tr><td><b>Loại đất</b></td><td><span class='popup-value'>" + loaiDat + "</span></td></tr>" +
-                        "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + tenChu + "'>" + tenChu + "</span></td></tr>" +
-                        "<tr><td><b>Số Định Danh</b></td><td><span class='popup-value'>" + soDinhDanh + "</span></td></tr>" +
-                        "<tr><td><b>Số phát hành thửa đất</b></td><td><span class='popup-value'>" + soPhatHanh + "</span></td></tr>" +
-                        "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + ngayTao + "</span></td></tr>" +
-                        "<tr><td><b>Ngày cập nhật</b></td><td><span class='popup-value'>" + ngayCapNhat + "</span></td></tr>" +
-                        "<tr><td><b>Trạng thái thửa đất</b></td><td><span class='popup-value'>" + trangThai + "</span></td></tr>" +
-                        "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + ghiChu + "'>" + ghiChu + "</span></td></tr>" +
-                        "</table>";
-
+                    
+                    popupContent += "</table>";
                     layer.bindPopup(popupContent, { maxWidth: 250 });
                 }
             }).addTo(map);
