@@ -68,27 +68,50 @@
         });
     }
 
-    // Hàm tự động cấp màu sắc tiêu chuẩn động theo ký hiệu loại đất quy hoạch
+    // Hàm tự động đổi màu thông minh, nhận diện cả ký hiệu lẫn chữ tiếng Việt có dấu
     function getMauTheoLoaiDat(loaiDat) {
         if (!loaiDat) return { color: "#666666", fillColor: "#888888" }; 
-        var code = loaiDat.toUpperCase().trim();
         
-        if (code.includes("ONT") || code.includes("ODT")) {
-            return { color: "#e74c3c", fillColor: "#ff7675" }; // Đất ở -> Màu hồng/đỏ
-        } else if (code.includes("CLN") || code.includes("CHN") || code.includes("HNK")) {
-            return { color: "#d35400", fillColor: "#f39c12" }; // Đất trồng cây -> Màu vàng cam
-        } else if (code.includes("LUC") || code.includes("LNK")) {
-            return { color: "#f1c40f", fillColor: "#f5cd79" }; // Đất lúa -> Màu vàng sáng
-        } else if (code.includes("NTS")) {
-            return { color: "#2980b9", fillColor: "#3498db" }; // Đất thủy sản -> Màu xanh biển
-        } else if (code.includes("RSX") || code.includes("RPH") || code.includes("RDD")) {
-            return { color: "#27ae60", fillColor: "#2ecc71" }; // Đất rừng -> Màu xanh lá cây
-        } else if (code.includes("TMD") || code.includes("SKC")) {
-            return { color: "#c0392b", fillColor: "#e67e22" }; // Thương mại/Sản xuất -> Màu cam đậm
-        } else if (code.includes("DGT") || code.includes("DTL") || code.includes("TON")) {
-            return { color: "#8e44ad", fillColor: "#9b59b6" }; // Công cộng/Giao thông -> Màu tím
+        // Chuyển hết thành chữ thường, xóa khoảng trắng và bỏ dấu tiếng Việt để quét chính xác 100%
+        var txt = String(loaiDat).toLowerCase().trim().replace(/\s+/g, '');
+        txt = txt.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+        txt = txt.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+        txt = txt.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+        txt = txt.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+        txt = txt.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+        txt = txt.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
+        txt = txt.replace(/đ/g, "d");
+        
+        // 1. Đất ở (Cơ sở tìm từ khóa: ont, odt, dato)
+        if (txt.includes("ont") || txt.includes("odt") || txt.includes("dato")) {
+            return { color: "#e74c3c", fillColor: "#ff7675" }; // Màu hồng/đỏ
+        } 
+        // 2. Đất trồng lúa (Cơ sở tìm từ khóa: luc, lnk, lua)
+        else if (txt.includes("luc") || txt.includes("lnk") || txt.includes("lua")) {
+            return { color: "#f1c40f", fillColor: "#f5cd79" }; // Màu vàng sáng chuẩn đất lúa
+        } 
+        // 3. Đất trồng cây (Cơ sở tìm từ khóa: cln, chn, hnk, caylaunam, cayhangnam)
+        else if (txt.includes("cln") || txt.includes("chn") || txt.includes("hnk") || txt.includes("cay")) {
+            return { color: "#d35400", fillColor: "#f39c12" }; // Màu vàng cam
+        } 
+        // 4. Đất nuôi trồng thủy sản (Cơ sở tìm từ khóa: nts, thuysan)
+        else if (txt.includes("nts") || txt.includes("thuysan")) {
+            return { color: "#2980b9", fillColor: "#3498db" }; // Màu xanh biển
+        } 
+        // 5. Đất rừng (Cơ sở tìm từ khóa: rsx, rph, rdd, rung)
+        else if (txt.includes("rsx") || txt.includes("rph") || txt.includes("rdd") || txt.includes("rung")) {
+            return { color: "#27ae60", fillColor: "#2ecc71" }; // Màu xanh lá cây
+        } 
+        // 6. Đất thương mại / Sản xuất (Cơ sở tìm từ khóa: tmd, skc, thuongmai, sanxuat)
+        else if (txt.includes("tmd") || txt.includes("skc") || txt.includes("thuongmai")) {
+            return { color: "#c0392b", fillColor: "#e67e22" }; // Màu cam đậm
+        } 
+        // 7. Đất công cộng / Giao thông / Thủy lợi (Cơ sở tìm từ khóa: dgt, dtl, ton, giaothong, thuyloi)
+        else if (txt.includes("dgt") || txt.includes("dtl") || txt.includes("ton") || txt.includes("giaothong")) {
+            return { color: "#8e44ad", fillColor: "#9b59b6" }; // Màu tím
         }
-        return { color: "#7f8c8d", fillColor: "#bdc3c7" }; // Mặc định -> Màu xám
+        
+        return { color: "#7f8c8d", fillColor: "#bdc3c7" }; // Mặc định nếu không khớp từ khóa nào -> Màu xám
     }
 
     fetch(webAppUrl)
