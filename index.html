@@ -68,43 +68,27 @@
         });
     }
 
-    // Hàm tự động cấp màu sắc tiêu chuẩn theo ký hiệu loại đất
+    // Hàm tự động cấp màu sắc tiêu chuẩn động theo ký hiệu loại đất quy hoạch
     function getMauTheoLoaiDat(loaiDat) {
-        if (!loaiDat) return { color: "#666666", fillColor: "#888888" }; // Đất trống/Không xác định (Màu xám)
-        
+        if (!loaiDat) return { color: "#666666", fillColor: "#888888" }; 
         var code = loaiDat.toUpperCase().trim();
         
-        // 1. Đất ở (Đô thị + Nông thôn) -> Tông màu Hồng / Đỏ quy hoạch
         if (code.includes("ONT") || code.includes("ODT")) {
-            return { color: "#e74c3c", fillColor: "#ff7675" }; 
+            return { color: "#e74c3c", fillColor: "#ff7675" }; // Đất ở -> Màu hồng/đỏ
+        } else if (code.includes("CLN") || code.includes("CHN") || code.includes("HNK")) {
+            return { color: "#d35400", fillColor: "#f39c12" }; // Đất trồng cây -> Màu vàng cam
+        } else if (code.includes("LUC") || code.includes("LNK")) {
+            return { color: "#f1c40f", fillColor: "#f5cd79" }; // Đất lúa -> Màu vàng sáng
+        } else if (code.includes("NTS")) {
+            return { color: "#2980b9", fillColor: "#3498db" }; // Đất thủy sản -> Màu xanh biển
+        } else if (code.includes("RSX") || code.includes("RPH") || code.includes("RDD")) {
+            return { color: "#27ae60", fillColor: "#2ecc71" }; // Đất rừng -> Màu xanh lá cây
+        } else if (code.includes("TMD") || code.includes("SKC")) {
+            return { color: "#c0392b", fillColor: "#e67e22" }; // Thương mại/Sản xuất -> Màu cam đậm
+        } else if (code.includes("DGT") || code.includes("DTL") || code.includes("TON")) {
+            return { color: "#8e44ad", fillColor: "#9b59b6" }; // Công cộng/Giao thông -> Màu tím
         }
-        // 2. Đất trồng cây lâu năm / Hàng năm -> Tông màu Vàng đất / Cam nhạt
-        else if (code.includes("CLN") || code.includes("CHN") || code.includes("HNK")) {
-            return { color: "#d35400", fillColor: "#f39c12" };
-        }
-        // 3. Đất trồng lúa nước -> Tông màu Vàng chanh / Vàng sáng
-        else if (code.includes("LUC") || code.includes("LNK")) {
-            return { color: "#f1c40f", fillColor: "#f5cd79" };
-        }
-        // 4. Đất nuôi trồng thủy sản -> Tông màu Xanh nước biển
-        else if (code.includes("NTS")) {
-            return { color: "#2980b9", fillColor: "#3498db" };
-        }
-        // 5. Đất rừng (Sản xuất, Phòng hộ, Đặc dụng) -> Tông màu Xanh lá cây đậm
-        else if (code.includes("RSX") || code.includes("RPH") || code.includes("RDD")) {
-            return { color: "#27ae60", fillColor: "#2ecc71" };
-        }
-        // 6. Đất thương mại, dịch vụ / Cơ sở sản xuất phi nông nghiệp -> Tông màu Cam đậm / Hổ phách
-        else if (code.includes("TMD") || code.includes("SKC")) {
-            return { color: "#c0392b", fillColor: "#e67e22" };
-        }
-        // 7. Đất giao thông, thủy lợi, công cộng -> Tông màu Xanh lam nhạt hoặc Tím quy hoạch
-        else if (code.includes("DGT") || code.includes("DTL") || code.includes("TON")) {
-            return { color: "#8e44ad", fillColor: "#9b59b6" };
-        }
-        
-        // Mặc định nếu gặp loại đất khác chưa định nghĩa
-        return { color: "#7f8c8d", fillColor: "#bdc3c7" };
+        return { color: "#7f8c8d", fillColor: "#bdc3c7" }; // Mặc định -> Màu xám
     }
 
     fetch(webAppUrl)
@@ -115,15 +99,14 @@
                 var coords = wktToCoords(item.wkt);
                 var p = item.properties;
                 
-                // Lấy màu tiêu chuẩn tự động theo loại đất từ Sheet
+                // Cấp màu sắc tự động theo loại đất
                 var mauSac = getMauTheoLoaiDat(p.loai_dat);
                 
-                // Vẽ thửa đất lên bản đồ với màu sắc động
                 var polygon = L.polygon(coords, { 
-                    color: mauSac.color,       // Màu viền tiêu chuẩn
-                    weight: 1.5,               // Độ dày viền
-                    fillColor: mauSac.fillColor,// Màu nền tiêu chuẩn theo loại đất
-                    fillOpacity: 0.45          // Độ trong suốt (vừa đủ nhìn nền vệ tinh bên dưới)
+                    color: mauSac.color, 
+                    weight: 1.5, 
+                    fillColor: mauSac.fillColor, 
+                    fillOpacity: 0.45 
                 }).addTo(map);
                 
                 var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
