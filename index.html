@@ -53,12 +53,12 @@
         else { navigator.geolocation.getCurrentPosition(function(p) { updateLocationMarker(p.coords.latitude, p.coords.longitude, p.coords.accuracy); map.setView(currentLatLng, 18); }, function(e){}, { enableHighAccuracy: true }); }
     }
 
-    function formatValue(key, val) {
-        if (!val) return "";
-        var cleanKey = key.toLowerCase();
-        if (cleanKey.includes("diện tích") || cleanKey.includes("dien tich")) {
-            var num = parseFloat(String(val).replace(/,/g, '.').replace(/[^0-9.]/g, ''));
-            if (!isNaN(num)) return new Intl.NumberFormat('vi-VN').format(num) + " m²";
+    // Định dạng hiển thị dấu chấm hàng nghìn cho Số diện tích từ dữ liệu sạch
+    function formatDienTich(val) {
+        if (val === undefined || val === null || val === "") return "";
+        var num = parseFloat(val);
+        if (!isNaN(num)) {
+            return new Intl.NumberFormat('vi-VN').format(num) + " m²";
         }
         return val;
     }
@@ -67,7 +67,7 @@
         var txt = wkt.replace("POLYGON((", "").replace("))", "");
         return txt.split(",").map(function(p) {
             var xy = p.trim().split(/\s+/);
-            return [parseFloat(xy[1]), parseFloat(xy[0])]; // Leaflet dùng [Lat, Lng]
+            return [parseFloat(xy[1]), parseFloat(xy[0])];
         });
     }
 
@@ -79,13 +79,34 @@
                 var coords = wktToCoords(item.wkt);
                 var polygon = L.polygon(coords, { color: "#e74c3c", weight: 1.5, fillColor: "#9b59b6", fillOpacity: 0.4 }).addTo(map);
                 
-                var popupContent = "<table class='popup-table'>";
-                for (var key in item.properties) {
-                    if (key.toLowerCase() === "geometry") continue;
-                    var displayVal = formatValue(key, item.properties[key]);
-                    popupContent += "<tr><td><b>" + key + "</b></td><td><span class='popup-value' title='" + displayVal + "'>" + displayVal + "</span></td></tr>";
-                }
-                popupContent += "</table>";
+                var p = item.properties;
+                
+                // Khai báo ánh xạ đọc dữ liệu linh hoạt, tìm theo chữ hoa chữ thường không sợ lệch tiêu đề gốc
+                var getVal = function(targetKey) {
+                    for (var key in p) {
+                        if (key.toLowerCase().trim() === targetKey.toLowerCase().trim()) {
+                            return p[key];
+                        }
+                    }
+                    return "";
+                };
+
+                // ÉP CỨNG CHỮ TIÊU ĐỀ TIẾNG VIỆT CHUẨN 100% Ở CỘT BÊN TRÁI POPUP
+                var popupContent = "<table class='popup-table'>" +
+                    "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + getVal("ID đất") + "</span></td></tr>" +
+                    "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + getVal("Số tờ") + "</span></td></tr>" +
+                    "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + getVal("Số thửa") + "</span></td></tr>" +
+                    "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(getVal("Diện tích")) + "</td></tr>" +
+                    "<tr><td><b>Loại đất</b></td><td><span class='popup-value'>" + getVal("Loại đất") + "</span></td></tr>" +
+                    "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + getVal("Tên chủ") + "'>" + getVal("Tên chủ") + "</span></td></tr>" +
+                    "<tr><td><b>Số Định Danh</b></td><td><span class='popup-value'>" + getVal("Số Định Danh") + "</span></td></tr>" +
+                    "<tr><td><b>Số phát hành thửa đất</b></td><td><span class='popup-value'>" + getVal("Số phát hành thửa đất") + "</span></td></tr>" +
+                    "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + getVal("Ngày tạo") + "</span></td></tr>" +
+                    "<tr><td><b>Ngày cập nhật</b></td><td><span class='popup-value'>" + getVal("Ngày cập nhật") + "</span></td></tr>" +
+                    "<tr><td><b>Trạng thái thửa đất</b></td><td><span class='popup-value'>" + getVal("Trạng thái thửa đất") + "</span></td></tr>" +
+                    "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + getVal("Ghi chú") + "'>" + getVal("Ghi chú") + "</span></td></tr>" +
+                    "</table>";
+
                 polygon.bindPopup(popupContent, { maxWidth: 250 });
             });
         })
