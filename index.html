@@ -29,9 +29,16 @@
 </button>
 
 <script>
+    // 1. Hỏi số điện thoại ngay khi vừa mở trang
+    var userPhone = prompt("Vui lòng nhập Số Điện Thoại để xác minh quyền truy cập bản đồ:", "");
+    userPhone = userPhone ? userPhone.trim() : "";
+
+    // 2. Khởi tạo bản đồ tự động định vị
     var map = L.map('map').setView([10.25, 105.18], 13);
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+    map.locate({ setView: true, maxZoom: 18, enableHighAccuracy: true });
 
+    // Link Web App Apps Script kết nối Google Sheet của bạn
     var webAppUrl = "https://script.google.com/macros/s/AKfycbyXnmcP5otInN-bMe6AYC6xDqG1w6_iR0uBaD9JgpcJuPmVU78HaMzBId_uHz1JOfrL/exec";
     var userMarker, userCircle, currentLatLng = null;
 
@@ -68,10 +75,8 @@
         });
     }
 
-    // Hàm tự động đổi màu thông minh, nhận diện cả ký hiệu lẫn chữ tiếng Việt có dấu
     function getMauTheoLoaiDat(loaiDat) {
         if (!loaiDat) return { color: "#666666", fillColor: "#888888" }; 
-        
         var txt = String(loaiDat).toLowerCase().trim().replace(/\s+/g, '');
         txt = txt.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
         txt = txt.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
@@ -81,47 +86,35 @@
         txt = txt.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
         txt = txt.replace(/đ/g, "d");
         
-        // 1. Đất ở (Cơ sở tìm từ khóa: ont, odt, dato)
-        if (txt.includes("ont") || txt.includes("odt") || txt.includes("dato")) {
-            return { color: "#e74c3c", fillColor: "#ff7675" }; 
-        } 
-        // 2. Đất trồng lúa (Cơ sở tìm từ khóa: luc, lnk, lua)
-        else if (txt.includes("luc") || txt.includes("lnk") || txt.includes("lua")) {
-            return { color: "#f1c40f", fillColor: "#f5cd79" }; 
-        } 
-        // 3. Đất trồng cây (Cơ sở tìm từ khóa: cln, chn, hnk, cay)
-        else if (txt.includes("cln") || txt.includes("chn") || txt.includes("hnk") || txt.includes("cay")) {
-            return { color: "#d35400", fillColor: "#f39c12" }; 
-        } 
-        // 4. Đất nuôi trồng thủy sản (Cơ sở tìm từ khóa: nts, thuysan)
-        else if (txt.includes("nts") || txt.includes("thuysan")) {
-            return { color: "#2980b9", fillColor: "#3498db" }; 
-        } 
-        // 5. Đất rừng (Cơ sở tìm từ khóa: rsx, rph, rdd, rung)
-        else if (txt.includes("rsx") || txt.includes("rph") || txt.includes("rdd") || txt.includes("rung")) {
-            return { color: "#27ae60", fillColor: "#2ecc71" }; 
-        } 
-        // 6. Đất thương mại / Sản xuất (Cơ sở tìm từ khóa: tmd, skc, thuongmai, sanxuat)
-        else if (txt.includes("tmd") || txt.includes("skc") || txt.includes("thuongmai")) {
-            return { color: "#c0392b", fillColor: "#e67e22" }; 
-        } 
-        // 7. Đất công cộng / Giao thông / Thủy lợi (Cơ sở tìm từ khóa: dgt, dtl, ton, giaothong, thuyloi)
-        else if (txt.includes("dgt") || txt.includes("dtl") || txt.includes("ton") || txt.includes("giaothong")) {
-            return { color: "#8e44ad", fillColor: "#9b59b6" }; 
-        }
-        
+        if (txt.includes("ont") || txt.includes("odt") || txt.includes("dato")) return { color: "#e74c3c", fillColor: "#ff7675" }; 
+        if (txt.includes("luc") || txt.includes("lnk") || txt.includes("lua")) return { color: "#f1c40f", fillColor: "#f5cd79" }; 
+        if (txt.includes("cln") || txt.includes("chn") || txt.includes("hnk") || txt.includes("cay")) return { color: "#d35400", fillColor: "#f39c12" }; 
+        if (txt.includes("nts") || txt.includes("thuysan")) return { color: "#2980b9", fillColor: "#3498db" }; 
+        if (txt.includes("rsx") || txt.includes("rph") || txt.includes("rdd") || txt.includes("rung")) return { color: "#27ae60", fillColor: "#2ecc71" }; 
+        if (txt.includes("tmd") || txt.includes("skc") || txt.includes("thuongmai")) return { color: "#c0392b", fillColor: "#e67e22" }; 
+        if (txt.includes("dgt") || txt.includes("dtl") || txt.includes("ton") || txt.includes("giaothong")) return { color: "#8e44ad", fillColor: "#9b59b6" }; 
         return { color: "#7f8c8d", fillColor: "#bdc3c7" }; 
     }
 
+    // Tải dữ liệu và thực hiện đối chiếu bảo mật danh sách SĐT riêng
     fetch(webAppUrl)
         .then(response => response.json())
-        .then(data => {
-            data.forEach(function(item) {
-                if (!item.wkt) return;
+        .then(res => {
+            var allowedPhones = res.allowedPhones || [];
+            var plots = res.plots || [];
+            
+            // Kiểm tra xem số điện thoại người dùng nhập có nằm trong Tab "Thương mại" không
+            var hopLe = allowedPhones.indexOf(userPhone) !== -1;
+            
+            if (!hopLe) {
+                alert("Số điện thoại không chính xác hoặc bạn không có quyền xem bản đồ này!");
+                return; // Ngắt ngang, khóa cứng không vẽ dữ liệu
+            }
+            
+            // Nếu SĐT hợp lệ, tiến hành bung dữ liệu bản đồ
+            plots.forEach(function(item) {
                 var coords = wktToCoords(item.wkt);
                 var p = item.properties;
-                
-                // Cấp màu sắc tự động theo giá trị loại đất thực tế trả về từ thuộc tính
                 var mauSac = getMauTheoLoaiDat(p.loai_dat);
                 
                 var polygon = L.polygon(coords, { 
@@ -133,7 +126,6 @@
                 
                 var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
 
-                // KHÓA CỨNG TEXT TIÊU ĐỀ TIẾNG VIỆT CHUẨN 100%
                 var popupContent = "<table class='popup-table'>" +
                     "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
                     "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
