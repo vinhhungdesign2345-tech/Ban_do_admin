@@ -29,30 +29,15 @@
 </button>
 
 <script>
-    // 1. Hỏi số điện thoại ngay khi vừa mở trang
-    var userPhone = prompt("Vui lòng nhập Số Điện Thoại để xác minh quyền truy cập bản đồ:", "");
-    userPhone = userPhone ? userPhone.trim() : "";
-
-    // 2. Khởi tạo bản đồ tự động định vị
-    var map = L.map('map').setView([10.25, 105.18], 13);
-    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
-    map.locate({ setView: true, maxZoom: 18, enableHighAccuracy: true });
-
-    // Link Web App Apps Script kết nối Google Sheet của bạn
+    var map, userMarker, userCircle, currentLatLng = null;
     var webAppUrl = "https://script.google.com/macros/s/AKfycbyXnmcP5otInN-bMe6AYC6xDqG1w6_iR0uBaD9JgpcJuPmVU78HaMzBId_uHz1JOfrL/exec";
-    var userMarker, userCircle, currentLatLng = null;
 
+    // Hàm định vị vị trí người dùng
     function updateLocationMarker(lat, lng, accuracy) {
         currentLatLng = L.latLng(lat, lng);
         if (userMarker) { map.removeLayer(userMarker); map.removeLayer(userCircle); }
         userMarker = L.circleMarker(currentLatLng, { radius: 8, fillColor: '#007bff', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
         userCircle = L.circle(currentLatLng, accuracy / 2, { color: '#007bff', fillColor: '#007bff', fillOpacity: 0.1, weight: 1 }).addTo(map);
-    }
-
-    if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(function(position) {
-            updateLocationMarker(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
-        }, function(e){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
     }
 
     function findMyLocation() {
@@ -96,55 +81,73 @@
         return { color: "#7f8c8d", fillColor: "#bdc3c7" }; 
     }
 
-    // Tải dữ liệu và thực hiện đối chiếu bảo mật danh sách SĐT riêng
-    fetch(webAppUrl)
-        .then(response => response.json())
-        .then(res => {
-            var allowedPhones = res.allowedPhones || [];
-            var plots = res.plots || [];
-            
-            // Kiểm tra xem số điện thoại người dùng nhập có nằm trong Tab "Thương mại" không
-            var hopLe = allowedPhones.indexOf(userPhone) !== -1;
-            
-            if (!hopLe) {
-                alert("Số điện thoại không chính xác hoặc bạn không có quyền xem bản đồ này!");
-                return; // Ngắt ngang, khóa cứng không vẽ dữ liệu
-            }
-            
-            // Nếu SĐT hợp lệ, tiến hành bung dữ liệu bản đồ
-            plots.forEach(function(item) {
-                var coords = wktToCoords(item.wkt);
-                var p = item.properties;
-                var mauSac = getMauTheoLoaiDat(p.loai_dat);
-                
-                var polygon = L.polygon(coords, { 
-                    color: mauSac.color, 
-                    weight: 1.5, 
-                    fillColor: mauSac.fillColor, 
-                    fillOpacity: 0.45 
-                }).addTo(map);
-                
-                var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
+    // ĐỢI TOÀN BỘ GIAO DIỆN TẢI XONG MỚI BẮT ĐẦU CHẠY KIỂM TRA BẢO MẬT
+    window.onload = function() {
+        // Hỏi số điện thoại
+        var userPhone = prompt("Vui lòng nhập Số Điện Thoại để xác minh quyền truy cập bản đồ:", "");
+        userPhone = userPhone ? userPhone.trim() : "";
 
-                var popupContent = "<table class='popup-table'>" +
-                    "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
-                    "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
-                    "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + check(p.so_thua) + "</span></td></tr>" +
-                    "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(p.dien_tich) + "</td></tr>" +
-                    "<tr><td><b>Loại đất</b></td><td><span class='popup-value'><b>" + check(p.loai_dat) + "</b></span></td></tr>" +
-                    "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
-                    "<tr><td><b>Số Định Danh</b></td><td><span class='popup-value'>" + check(p.so_dinh_danh) + "</span></td></tr>" +
-                    "<tr><td><b>Số phát hành thửa đất</b></td><td><span class='popup-value'>" + check(p.so_phat_hanh) + "</span></td></tr>" +
-                    "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + check(p.ngay_tao) + "</span></td></tr>" +
-                    "<tr><td><b>Ngày cập nhật</b></td><td><span class='popup-value'>" + check(p.ngay_cap_nhat) + "</span></td></tr>" +
-                    "<tr><td><b>Trạng thái thửa đất</b></td><td><span class='popup-value'>" + check(p.trang_thai) + "</span></td></tr>" +
-                    "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
-                    "</table>";
+        // Khởi tạo bản đồ nền
+        map = L.map('map').setView([10.25, 105.18], 13);
+        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+        map.locate({ setView: true, maxZoom: 18, enableHighAccuracy: true });
 
-                polygon.bindPopup(popupContent, { maxWidth: 250 });
-            });
-        })
-        .catch(error => console.error('Lỗi tải dữ liệu:', error));
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(function(position) {
+                updateLocationMarker(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+            }, function(e){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+        }
+
+        // Tải dữ liệu từ Apps Script
+        fetch(webAppUrl)
+            .then(response => response.json())
+            .then(res => {
+                var allowedPhones = res.allowedPhones || [];
+                var plots = res.plots || [];
+                
+                // Đối chiếu số điện thoại với dữ liệu cột A trong Tab "Thương mại"
+                var hopLe = allowedPhones.indexOf(userPhone) !== -1;
+                
+                if (!hopLe) {
+                    alert("Số điện thoại không chính xác hoặc bạn không có quyền xem bản đồ này!");
+                    return; // Khóa cứng, không vẽ gì lên bản đồ
+                }
+                
+                // Nếu đúng SĐT, tiến hành bung lụa vẽ các thửa đất
+                plots.forEach(function(item) {
+                    var coords = wktToCoords(item.wkt);
+                    var p = item.properties;
+                    var mauSac = getMauTheoLoaiDat(p.loai_dat);
+                    
+                    var polygon = L.polygon(coords, { 
+                        color: mauSac.color, 
+                        weight: 1.5, 
+                        fillColor: mauSac.fillColor, 
+                        fillOpacity: 0.45 
+                    }).addTo(map);
+                    
+                    var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
+
+                    var popupContent = "<table class='popup-table'>" +
+                        "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
+                        "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
+                        "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + check(p.so_thua) + "</span></td></tr>" +
+                        "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(p.dien_tich) + "</td></tr>" +
+                        "<tr><td><b>Loại đất</b></td><td><span class='popup-value'><b>" + check(p.loai_dat) + "</b></span></td></tr>" +
+                        "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
+                        "<tr><td><b>Số Định Danh</b></td><td><span class='popup-value'>" + check(p.so_dinh_danh) + "</span></td></tr>" +
+                        "<tr><td><b>Số phát hành thửa đất</b></td><td><span class='popup-value'>" + check(p.so_phat_hanh) + "</span></td></tr>" +
+                        "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + check(p.ngay_tao) + "</span></td></tr>" +
+                        "<tr><td><b>Ngày cập nhật</b></td><td><span class='popup-value'>" + check(p.ngay_cap_nhat) + "</span></td></tr>" +
+                        "<tr><td><b>Trạng thái thửa đất</b></td><td><span class='popup-value'>" + check(p.trang_thai) + "</span></td></tr>" +
+                        "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
+                        "</table>";
+
+                    polygon.bindPopup(popupContent, { maxWidth: 250 });
+                });
+            })
+            .catch(error => console.error('Lỗi tải dữ liệu:', error));
+    };
 </script>
 </body>
 </html>
