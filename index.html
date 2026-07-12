@@ -29,14 +29,23 @@
 </button>
 
 <script>
-    var map, userMarker, userCircle, currentLatLng = null;
+    var map = L.map('map').setView([10.25, 105.18], 13);
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+
     var webAppUrl = "https://script.google.com/macros/s/AKfycbyXnmcP5otInN-bMe6AYC6xDqG1w6_iR0uBaD9JgpcJuPmVU78HaMzBId_uHz1JOfrL/exec";
+    var userMarker, userCircle, currentLatLng = null;
 
     function updateLocationMarker(lat, lng, accuracy) {
         currentLatLng = L.latLng(lat, lng);
         if (userMarker) { map.removeLayer(userMarker); map.removeLayer(userCircle); }
         userMarker = L.circleMarker(currentLatLng, { radius: 8, fillColor: '#007bff', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
         userCircle = L.circle(currentLatLng, accuracy / 2, { color: '#007bff', fillColor: '#007bff', fillOpacity: 0.1, weight: 1 }).addTo(map);
+    }
+
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(function(position) {
+            updateLocationMarker(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+        }, function(e){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
     }
 
     function findMyLocation() {
@@ -59,8 +68,10 @@
         });
     }
 
+    // Hàm tự động đổi màu thông minh, nhận diện cả ký hiệu lẫn chữ tiếng Việt có dấu
     function getMauTheoLoaiDat(loaiDat) {
         if (!loaiDat) return { color: "#666666", fillColor: "#888888" }; 
+        
         var txt = String(loaiDat).toLowerCase().trim().replace(/\s+/g, '');
         txt = txt.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
         txt = txt.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
@@ -70,80 +81,78 @@
         txt = txt.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
         txt = txt.replace(/đ/g, "d");
         
-        if (txt.includes("ont") || txt.includes("odt") || txt.includes("dato")) return { color: "#e74c3c", fillColor: "#ff7675" }; 
-        if (txt.includes("luc") || txt.includes("lnk") || txt.includes("lua")) return { color: "#f1c40f", fillColor: "#f5cd79" }; 
-        if (txt.includes("cln") || txt.includes("chn") || txt.includes("hnk") || txt.includes("cay")) return { color: "#d35400", fillColor: "#f39c12" }; 
-        if (txt.includes("nts") || txt.includes("thuysan")) return { color: "#2980b9", fillColor: "#3498db" }; 
-        if (txt.includes("rsx") || txt.includes("rph") || txt.includes("rdd") || txt.includes("rung")) return { color: "#27ae60", fillColor: "#2ecc71" }; 
-        if (txt.includes("tmd") || txt.includes("skc") || txt.includes("thuongmai")) return { color: "#c0392b", fillColor: "#e67e22" }; 
-        if (txt.includes("dgt") || txt.includes("dtl") || txt.includes("ton") || txt.includes("giaothong")) return { color: "#8e44ad", fillColor: "#9b59b6" }; 
+        // 1. Đất ở (Cơ sở tìm từ khóa: ont, odt, dato)
+        if (txt.includes("ont") || txt.includes("odt") || txt.includes("dato")) {
+            return { color: "#e74c3c", fillColor: "#ff7675" }; 
+        } 
+        // 2. Đất trồng lúa (Cơ sở tìm từ khóa: luc, lnk, lua)
+        else if (txt.includes("luc") || txt.includes("lnk") || txt.includes("lua")) {
+            return { color: "#f1c40f", fillColor: "#f5cd79" }; 
+        } 
+        // 3. Đất trồng cây (Cơ sở tìm từ khóa: cln, chn, hnk, cay)
+        else if (txt.includes("cln") || txt.includes("chn") || txt.includes("hnk") || txt.includes("cay")) {
+            return { color: "#d35400", fillColor: "#f39c12" }; 
+        } 
+        // 4. Đất nuôi trồng thủy sản (Cơ sở tìm từ khóa: nts, thuysan)
+        else if (txt.includes("nts") || txt.includes("thuysan")) {
+            return { color: "#2980b9", fillColor: "#3498db" }; 
+        } 
+        // 5. Đất rừng (Cơ sở tìm từ khóa: rsx, rph, rdd, rung)
+        else if (txt.includes("rsx") || txt.includes("rph") || txt.includes("rdd") || txt.includes("rung")) {
+            return { color: "#27ae60", fillColor: "#2ecc71" }; 
+        } 
+        // 6. Đất thương mại / Sản xuất (Cơ sở tìm từ khóa: tmd, skc, thuongmai, sanxuat)
+        else if (txt.includes("tmd") || txt.includes("skc") || txt.includes("thuongmai")) {
+            return { color: "#c0392b", fillColor: "#e67e22" }; 
+        } 
+        // 7. Đất công cộng / Giao thông / Thủy lợi (Cơ sở tìm từ khóa: dgt, dtl, ton, giaothong, thuyloi)
+        else if (txt.includes("dgt") || txt.includes("dtl") || txt.includes("ton") || txt.includes("giaothong")) {
+            return { color: "#8e44ad", fillColor: "#9b59b6" }; 
+        }
+        
         return { color: "#7f8c8d", fillColor: "#bdc3c7" }; 
     }
 
-    window.onload = function() {
-        var userPhone = prompt("Vui lòng nhập Số Điện Thoại để xác minh quyền truy cập bản đồ:", "");
-        userPhone = userPhone ? userPhone.trim() : "";
-
-        map = L.map('map').setView([10.25, 105.18], 13);
-        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
-        map.locate({ setView: true, maxZoom: 18, enableHighAccuracy: true });
-
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(function(position) {
-                updateLocationMarker(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
-            }, function(e){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
-        }
-
-        fetch(webAppUrl)
-            .then(response => response.json())
-            .then(res => {
-                var allowedPhones = res.allowedPhones || [];
-                var plots = res.plots || [];
+    fetch(webAppUrl)
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(function(item) {
+                if (!item.wkt) return;
+                var coords = wktToCoords(item.wkt);
+                var p = item.properties;
                 
-                // Chuẩn hóa danh sách SĐT từ sheet về dạng chuỗi sạch để so khớp chính xác
-                var cleanAllowedPhones = allowedPhones.map(function(p) { return String(p).trim(); });
-                var hopLe = cleanAllowedPhones.indexOf(userPhone) !== -1;
+                // Cấp màu sắc tự động theo giá trị loại đất thực tế trả về từ thuộc tính
+                var mauSac = getMauTheoLoaiDat(p.loai_dat);
                 
-                if (!hopLe) {
-                    alert("Số điện thoại không chính xác hoặc bạn không có quyền xem bản đồ này!");
-                    return; // Chặn đứng, không vẽ dữ liệu
-                }
+                var polygon = L.polygon(coords, { 
+                    color: mauSac.color, 
+                    weight: 1.5, 
+                    fillColor: mauSac.fillColor, 
+                    fillOpacity: 0.45 
+                }).addTo(map);
                 
-                // Nếu đúng SĐT, tiến hành vẽ các thửa đất lên bản đồ
-                plots.forEach(function(item) {
-                    var coords = wktToCoords(item.wkt);
-                    var p = item.properties;
-                    var mauSac = getMauTheoLoaiDat(p.loai_dat);
-                    
-                    var polygon = L.polygon(coords, { 
-                        color: mauSac.color, 
-                        weight: 1.5, 
-                        fillColor: mauSac.fillColor, 
-                        fillOpacity: 0.45 
-                    }).addTo(map);
-                    
-                    var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
+                var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
 
-                    var popupContent = "<table class='popup-table'>" +
-                        "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
-                        "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
-                        "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + check(p.so_thua) + "</span></td></tr>" +
-                        "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(p.dien_tich) + "</td></tr>" +
-                        "<tr><td><b>Loại đất</b></td><td><span class='popup-value'><b>" + check(p.loai_dat) + "</b></span></td></tr>" +
-                        "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
-                        "<tr><td><b>Số Định Danh</b></td><td><span class='popup-value'>" + check(p.so_dinh_danh) + "</span></td></tr>" +
-                        "<tr><td><b>Số phát hành thửa đất</b></td><td><span class='popup-value'>" + check(p.so_phat_hanh) + "</span></td></tr>" +
-                        "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + check(p.ngay_tao) + "</span></td></tr>" +
-                        "<tr><td><b>Ngày cập nhật</b></td><td><span class='popup-value'>" + check(p.ngay_cap_nhat) + "</span></td></tr>" +
-                        "<tr><td><b>Trạng thái thửa đất</b></td><td><span class='popup-value'>" + check(p.trang_thai) + "</span></td></tr>" +
-                        "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
-                        "</table>";
+                // KHÓA CỨNG TEXT TIÊU ĐỀ TIẾNG VIỆT CHUẨN 100%
+                var popupContent = "<table class='popup-table'>" +
+                    "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
+                    "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
+                    "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + check(p.so_thua) + "</span></td></tr>" +
+                    "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(p.dien_tich) + "</td></tr>" +
+                    "<tr><td><b>Loại đất</b></td><td><span class='popup-value'><b>" + check(p.loai_dat) + "</b></span></td></tr>" +
+                    "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
+                    "<tr><td><b>Số Định Danh</b></td><td><span class='popup-value'>" + check(p.so_dinh_danh) + "</span></td></tr>" +
+                    "<tr><td><b>Số phát hành thửa đất</b></td><td><span class='popup-value'>" + check(p.so_phat_hanh) + "</span></td></tr>" +
+                    "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + check(p.ngay_tao) + "</span></td></tr>" +
+                    "<tr><td><b>Ngày cập nhật</b></td><td><span class='popup-value'>" + check(p.ngay_cap_nhat) + "</span></td></tr>" +
+                    "<tr><td><b>Trạng thái thửa đất</b></td><td><span class='popup-value'>" + check(p.trang_thai) + "</span></td></tr>" +
+                    "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
+                    "</table>";
 
-                    polygon.bindPopup(popupContent, { maxWidth: 250 });
-                });
-            })
-            .catch(error => console.error('Lỗi tải dữ liệu:', error));
-    };
+                polygon.bindPopup(popupContent, { maxWidth: 250 });
+            });
+        })
+        .catch(error => console.error('Lỗi tải dữ liệu:', error));
 </script>
 </body>
 </html>
