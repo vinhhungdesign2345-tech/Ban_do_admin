@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bản Đồ Thửa Đất Thực Địa</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; }
+        .leaflet-popup-content { margin: 8px 10px; line-height: 1.2; }
+        .popup-table { border-collapse: collapse; width: 100%; font-size: 11px; color: #444; }
+        .popup-table td { border: 1px solid #eee; padding: 2px 4px; vertical-align: top; }
+        .popup-table b { color: #333; font-weight: 600; }
+        .popup-table tr:nth-child(even){background-color: #fafafa;}
+        .popup-value { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .gps-button {
+            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
+            background: white; border: none; width: 50px; height: 50px;
+            border-radius: 50%; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<button class="gps-button" onclick="findMyLocation()">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2.5"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1" fill="#007bff"></circle><line x1="12" y1="1" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="23"></line><line x1="1" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="23" y2="12"></line></svg>
+</button>
+
+<script>
+    var map = L.map('map').setView([10.25, 105.18], 13);
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+
+    var webAppUrl = "https://script.google.com/macros/s/AKfycbwJy-AYAzB4ByOQH0VPluNuAZxLzYSmOsT6EaUB8SEKhaz41Ftttsb9S1TBA0uqINqC/exec";
+    var userMarker, userCircle, currentLatLng = null;
+
+    function updateLocationMarker(lat, lng, accuracy) {
+        currentLatLng = L.latLng(lat, lng);
+        if (userMarker) { map.removeLayer(userMarker); map.removeLayer(userCircle); }
+        userMarker = L.circleMarker(currentLatLng, { radius: 8, fillColor: '#007bff', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+        userCircle = L.circle(currentLatLng, accuracy / 2, { color: '#007bff', fillColor: '#007bff', fillOpacity: 0.1, weight: 1 }).addTo(map);
+    }
+
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(function(position) {
+            updateLocationMarker(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+        }, function(e){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+    }
+
+    function findMyLocation() {
+        if (currentLatLng) { map.setView(currentLatLng, 18); }
+        else { navigator.geolocation.getCurrentPosition(function(p) { updateLocationMarker(p.coords.latitude, p.coords.longitude, p.coords.accuracy); map.setView(currentLatLng, 18); }, function(e){}, { enableHighAccuracy: true }); }
+    }
+
+    function formatDienTich(val) {
+        if (val === undefined || val === null || val === "") return "";
+        var num = parseFloat(val);
+        if (!isNaN(num)) return new Intl.NumberFormat('vi-VN').format(num) + " m²";
+        return val;
+    }
+
+    function getMauTheoLoaiDat(loaiDat) {
+        if (!loaiDat) return { color: "#666666", fillColor: "#888888" }; 
+        var txt = String(loaiDat).toLowerCase().trim().replace(/\s+/g, '');
+        txt = txt.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+        txt = txt.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+        txt = txt.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+        txt = txt.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+        txt = txt.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+        txt = txt.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
+        txt = txt.replace(/đ/g, "d");
+        if (txt.includes("ont") || txt.includes("odt") || txt.includes("dato")) return { color: "#e74c3c", fillColor: "#ff7675" }; 
+        if (txt.includes("luc") || txt.includes("lnk") || txt.includes("lua")) return { color: "#f1c40f", fillColor: "#f5cd79" }; 
+        if (txt.includes("cln") || txt.includes("chn") || txt.includes("hnk") || txt.includes("cay")) return { color: "#d35400", fillColor: "#f39c12" }; 
+        if (txt.includes("nts") || txt.includes("thuysan")) return { color: "#2980b9", fillColor: "#3498db" }; 
+        if (txt.includes("rsx") || txt.includes("rph") || txt.includes("rdd") || txt.includes("rung")) return { color: "#27ae60", fillColor: "#2ecc71" }; 
+        if (txt.includes("tmd") || txt.includes("skc") || txt.includes("thuongmai")) return { color: "#c0392b", fillColor: "#e67e22" }; 
+        if (txt.includes("dgt") || txt.includes("dtl") || txt.includes("ton") || txt.includes("giaothong")) return { color: "#8e44ad", fillColor: "#9b59b6" }; 
+        return { color: "#7f8c8d", fillColor: "#bdc3c7" }; 
+    }
+
+    function wktToCoords(wkt) {
+        var txt = wkt.replace("POLYGON((", "").replace("))", "");
+        return txt.split(",").map(function(p) {
+            var xy = p.trim().split(/\s+/);
+            return [parseFloat(xy[1]), parseFloat(xy[0])];
+        });
+    }
+
+    function getBrowserAndOS() {
+        var ua = navigator.userAgent;
+        var os = "Thiết bị không rõ";
+        if (ua.indexOf("iPhone") > -1) os = "iPhone (iOS)";
+        else if (ua.indexOf("iPad") > -1) os = "iPad (iOS)";
+        else if (ua.indexOf("Android") > -1) os = "Điện thoại Android";
+        else if (ua.indexOf("Windows") > -1) os = "Máy tính Windows";
+        else if (ua.indexOf("Macintosh") > -1) os = "Máy tính Macbook";
+        var browser = "Trình duyệt ẩn danh/Khác";
+        if (ua.indexOf("Chrome") > -1 && ua.indexOf("Safari") > -1 && ua.indexOf("Edge") === -1) browser = "Chrome";
+        else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) browser = "Safari";
+        else if (ua.indexOf("Firefox") > -1) browser = "Firefox";
+        else if (ua.indexOf("Edg") > -1) browser = "Edge";
+        return os + " - " + browser;
+    }
+
+    function getOrCreateDeviceId() {
+        var id = localStorage.getItem("map_device_token");
+        if (!id) {
+            id = "DEV-" + Math.random().toString(36).substring(2, 11).toUpperCase() + "-" + Date.now().toString().slice(-4);
+            localStorage.setItem("map_device_token", id);
+        }
+        return id;
+    }
+
+    fetch(webAppUrl)
+        .then(response => response.json())
+        .then(res => {
+            var allowedUsers = res.allowedUsers || [];
+            var plots = res.plots || [];
+            
+            var userPhone = prompt("Vui lòng nhập Số Điện Thoại để truy cập hệ thống:", "");
+            userPhone = userPhone ? userPhone.trim() : "";
+            var userPass = prompt("Vui lòng nhập Mật khẩu bảo mật:", "");
+            userPass = userPass ? userPass.trim() : "";
+            
+            var currentClientDeviceId = getOrCreateDeviceId();
+            var currentClientDeviceInfo = getBrowserAndOS();
+            
+            var accountFound = null;
+            for (var i = 0; i < allowedUsers.length; i++) {
+                if (allowedUsers[i].phone === userPhone && allowedUsers[i].password === userPass) {
+                    accountFound = allowedUsers[i];
+                    break;
+                }
+            }
+            
+            if (!accountFound) {
+                alert("Thông tin đăng nhập không chính xác hoặc tài khoản của bạn đang bị khóa!");
+                document.getElementById("map").style.display = "none";
+                return;
+            }
+            
+            if (accountFound.savedDeviceId !== "") {
+                if (accountFound.savedDeviceId !== currentClientDeviceId) {
+                    alert("LỖI BẢO MẬT: Tài khoản này đã đăng ký bản quyền trên thiết bị khác! Bạn không thể dùng chung thiết bị này.");
+                    document.getElementById("map").style.display = "none";
+                    return;
+                }
+            } else {
+                alert("Hệ thống đang tiến hành thiết lập khóa bảo mật thiết bị cá nhân cho lần đầu đăng nhập...");
+                fetch(webAppUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        action: "register_device",
+                        phone: userPhone,
+                        device_info: currentClientDeviceInfo,
+                        device_id: currentClientDeviceId
+                    })
+                });
+            }
+
+            plots.forEach(function(item) {
+                if (!item.wkt) return;
+                var coords = wktToCoords(item.wkt);
+                var p = item.properties;
+                var mauSac = getMauTheoLoaiDat(p.loai_dat);
+                
+                var polygon = L.polygon(coords, { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 }).addTo(map);
+                var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
+
+                var popupContent = "<table class='popup-table'>" +
+                    "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
+                    "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
+                    "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + check(p.so_thua) + "</span></td></tr>" +
+                    "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(p.dien_tich) + "</td></tr>" +
+                    "<tr><td><b>Loại đất</b></td><td><span class='popup-value'><b>" + check(p.loai_dat) + "</b></span></td></tr>" +
+                    "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
+                    "<tr><td><b>Số Định Danh</b></td><td><span class='popup-value'>" + check(p.so_dinh_danh) + "</span></td></tr>" +
+                    "<tr><td><b>Số phát hành thửa đất</b></td><td><span class='popup-value'>" + check(p.so_phat_hanh) + "</span></td></tr>" +
+                    "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + check(p.ngay_tao) + "</span></td></tr>" +
+                    "<tr><td><b>Ngày cập nhật</b></td><td><span class='popup-value'>" + check(p.ngay_cap_nhat) + "</span></td></tr>" +
+                    "<tr><td><b>Trạng thái thửa đất</b></td><td><span class='popup-value'>" + check(p.trang_thai) + "</span></td></tr>" +
+                    "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
+                    "</table>";
+
+                polygon.bindPopup(popupContent, { maxWidth: 250 });
+            });
+        })
+        .catch(error => console.error('Lỗi tải dữ liệu:', error));
+</script>
+</body>
+</html>
