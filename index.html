@@ -32,7 +32,6 @@
     var map, userMarker, userCircle, currentLatLng = null;
     var webAppUrl = "https://script.google.com/macros/s/AKfycbyXnmcP5otInN-bMe6AYC6xDqG1w6_iR0uBaD9JgpcJuPmVU78HaMzBId_uHz1JOfrL/exec";
 
-    // Hàm định vị vị trí người dùng
     function updateLocationMarker(lat, lng, accuracy) {
         currentLatLng = L.latLng(lat, lng);
         if (userMarker) { map.removeLayer(userMarker); map.removeLayer(userCircle); }
@@ -81,13 +80,10 @@
         return { color: "#7f8c8d", fillColor: "#bdc3c7" }; 
     }
 
-    // ĐỢI TOÀN BỘ GIAO DIỆN TẢI XONG MỚI BẮT ĐẦU CHẠY KIỂM TRA BẢO MẬT
     window.onload = function() {
-        // Hỏi số điện thoại
         var userPhone = prompt("Vui lòng nhập Số Điện Thoại để xác minh quyền truy cập bản đồ:", "");
         userPhone = userPhone ? userPhone.trim() : "";
 
-        // Khởi tạo bản đồ nền
         map = L.map('map').setView([10.25, 105.18], 13);
         L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
         map.locate({ setView: true, maxZoom: 18, enableHighAccuracy: true });
@@ -98,22 +94,22 @@
             }, function(e){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
         }
 
-        // Tải dữ liệu từ Apps Script
         fetch(webAppUrl)
             .then(response => response.json())
             .then(res => {
                 var allowedPhones = res.allowedPhones || [];
                 var plots = res.plots || [];
                 
-                // Đối chiếu số điện thoại với dữ liệu cột A trong Tab "Thương mại"
-                var hopLe = allowedPhones.indexOf(userPhone) !== -1;
+                // Chuẩn hóa danh sách SĐT từ sheet về dạng chuỗi sạch để so khớp chính xác
+                var cleanAllowedPhones = allowedPhones.map(function(p) { return String(p).trim(); });
+                var hopLe = cleanAllowedPhones.indexOf(userPhone) !== -1;
                 
                 if (!hopLe) {
                     alert("Số điện thoại không chính xác hoặc bạn không có quyền xem bản đồ này!");
-                    return; // Khóa cứng, không vẽ gì lên bản đồ
+                    return; // Chặn đứng, không vẽ dữ liệu
                 }
                 
-                // Nếu đúng SĐT, tiến hành bung lụa vẽ các thửa đất
+                // Nếu đúng SĐT, tiến hành vẽ các thửa đất lên bản đồ
                 plots.forEach(function(item) {
                     var coords = wktToCoords(item.wkt);
                     var p = item.properties;
