@@ -34,7 +34,7 @@ layer.on('click', function(e) {
     // 3. Đút khung vào trang web để kích hoạt cào dữ liệu
     document.body.appendChild(iframe);
     
-    // 4. Thời gian chờ tự hủy khung (Điện thoại mạng chậm hơn nên ưu tiên để 12 giây, PC chạy xong trước vẫn tự hủy được)
+    // 4. Thời gian chờ tự hủy khung (Ưu tiên để 12 giây cho di động, PC xong trước vẫn tự hủy được)
     setTimeout(function() {
         if (iframe) {
             iframe.remove();
