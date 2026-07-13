@@ -1,44 +1,182 @@
-// =========================================================================
-// CHỨC NĂNG ĐỒNG BỘ CÀO NGẦM GULAND - CHẠY CHUNG CHO CẢ PC VÀ ĐIỆN THOẠI (LEMUR)
-// =========================================================================
-layer.on('click', function(e) {
-    var soTo = properties.so_to;
-    var soThua = properties.so_thua;
-    var lat = layer.getBounds().getCenter().lat;
-    var lng = layer.getBounds().getCenter().lng;
-
-    var gulandUrl = `https://guland.vn/ban-do-quy-hoach?lat=${lat}&lng=${lng}&zoom=19`;
-    
-    // 1. Tạo thẻ iframe ngầm
-    var iframe = document.createElement('iframe');
-    iframe.src = gulandUrl;
-    iframe.name = JSON.stringify({ so_to: soTo, so_thua: soThua });
-    iframe.style.border = 'none';
-
-    // 2. TỰ ĐỘNG NHẬN DIỆN THIẾT BỊ ĐỂ ÁP DỤNG CẤU HÌNH PHÙ HỢP
-    var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        // Cấu hình dành riêng cho Điện thoại (Lemur Browser) để tránh bị đóng băng ngầm
-        iframe.style.width = '1px';
-        iframe.style.height = '1px';
-        iframe.style.position = 'absolute';
-        iframe.style.left = '-9999px'; 
-        console.log("Đang chạy luồng ngầm trên Điện thoại (Lemur)...");
-    } else {
-        // Cấu hình dành riêng cho Máy tính (PC) - Ẩn hoàn toàn cực sạch sẽ
-        iframe.style.display = 'none';
-        console.log("Đang chạy luồng ngầm trên Máy tính (PC)...");
-    }
-    
-    // 3. Đút khung vào trang web để kích hoạt cào dữ liệu
-    document.body.appendChild(iframe);
-    
-    // 4. Thời gian chờ tự hủy khung (Ưu tiên để 12 giây cho di động, PC xong trước vẫn tự hủy được)
-    setTimeout(function() {
-        if (iframe) {
-            iframe.remove();
-            console.log("Đã hủy khung ngầm của thửa: " + soThua);
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bản Đồ Quản Lý Thực Địa</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; }
+        .leaflet-popup-content { margin: 8px 10px; line-height: 1.2; }
+        .popup-table { border-collapse: collapse; width: 100%; font-size: 11px; color: #444; }
+        .popup-table td { border: 1px solid #eee; padding: 2px 4px; vertical-align: top; }
+        .popup-table b { color: #333; font-weight: 600; }
+        .popup-table tr:nth-child(even){background-color: #fafafa;}
+        .popup-value { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .gps-button {
+            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
+            background: white; border: none; width: 50px; height: 50px;
+            border-radius: 50%; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
-    }, 12000);
-});
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<button class="gps-button" onclick="findMyLocation()">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2.5"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1" fill="#007bff"></circle><line x1="12" y1="1" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="23"></line><line x1="1" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="23" y2="12"></line></svg>
+</button>
+
+<script>
+    // =========================================================================
+    // ⚠️ QUAN TRỌNG: BẠN HÃY THAY LINK WEB APP GOOGLE MỚI CỦA BẠN VÀO ĐÂY
+    // =========================================================================
+    var webAppUrl = "https://script.google.com/macros/s/AKfycbzgSByOebhpYGHMysEooPt9F2E766dyQNNz8sZPBjf6IrqXKK4uYlYmeT6D0qEbITqh/exec";
+
+    var map = L.map('map').setView([10.25, 105.18], 13);
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+
+    var userMarker, userCircle, currentLatLng = null;
+
+    function updateLocationMarker(lat, lng, accuracy) {
+        currentLatLng = L.latLng(lat, lng);
+        if (userMarker) { map.removeLayer(userMarker); map.removeLayer(userCircle); }
+        userMarker = L.circleMarker(currentLatLng, { radius: 8, fillColor: '#007bff', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+        userCircle = L.circle(currentLatLng, accuracy / 2, { color: '#007bff', fillColor: '#007bff', fillOpacity: 0.1, weight: 1 }).addTo(map);
+    }
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(function(position) {
+            updateLocationMarker(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+        }, function(e){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+    }
+    function findMyLocation() {
+        if (currentLatLng) { map.setView(currentLatLng, 18); }
+        else { navigator.geolocation.getCurrentPosition(function(p) { updateLocationMarker(p.coords.latitude, p.coords.longitude, p.coords.accuracy); map.setView(currentLatLng, 18); }, function(e){}, { enableHighAccuracy: true }); }
+    }
+
+    function formatDienTich(val) {
+        if (val === undefined || val === null || val === "") return "";
+        var num = parseFloat(val);
+        if (!isNaN(num)) return new Intl.NumberFormat('vi-VN').format(num) + " m²";
+        return val;
+    }
+    function getBrowserAndOS() {
+        var ua = navigator.userAgent;
+        var os = "Thiết bị lạ";
+        if (ua.indexOf("iPhone") > -1) os = "iPhone";
+        else if (ua.indexOf("Android") > -1) os = "Android";
+        else if (ua.indexOf("Windows") > -1) os = "PC Windows";
+        var browser = "Web";
+        if (ua.indexOf("Chrome") > -1) browser = "Chrome";
+        else if (ua.indexOf("Safari") > -1) browser = "Safari";
+        return os + " (" + browser + ")";
+    }
+    function getOrCreateDeviceId() {
+        var id = localStorage.getItem("map_secure_token");
+        if (!id) {
+            id = "ID-" + Math.random().toString(36).substring(2, 11).toUpperCase();
+            localStorage.setItem("map_secure_token", id);
+        }
+        return id;
+    }
+    function getMauTheoLoaiDat(loaiDat) {
+        if (!loaiDat) return { color: "#666666", fillColor: "#888888" }; 
+        var txt = String(loaiDat).toLowerCase().trim().replace(/\s+/g, '');
+        txt = txt.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a").replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e").replace(/ì|í|ị|ỉ|ĩ/g, "i").replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o").replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u").replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y").replace(/đ/g, "d");
+        if (txt.includes("ont") || txt.includes("odt") || txt.includes("dato")) return { color: "#e74c3c", fillColor: "#ff7675" }; 
+        if (txt.includes("luc") || txt.includes("lnk") || txt.includes("lua")) return { color: "#f1c40f", fillColor: "#f5cd79" }; 
+        if (txt.includes("cln") || txt.includes("chn") || txt.includes("hnk") || txt.includes("cay")) return { color: "#d35400", fillColor: "#f39c12" }; 
+        if (txt.includes("nts") || txt.includes("thuysan")) return { color: "#2980b9", fillColor: "#3498db" }; 
+        return { color: "#7f8c8d", fillColor: "#bdc3c7" }; 
+    }
+    function wktToCoords(wkt) {
+        var txt = wkt.replace("POLYGON((", "").replace("))", "");
+        return txt.split(",").map(function(p) {
+            var xy = p.trim().split(/\s+/);
+            return [parseFloat(xy[1]), parseFloat(xy[0])];
+        });
+    }
+
+    // LUỒNG XỬ LÝ ĐĂNG NHẬP HỢP NHẤT
+    fetch(webAppUrl)
+        .then(response => response.json())
+        .then(res => {
+            var allowedUsers = res.allowedUsers || [];
+            var plots = res.plots || [];
+            
+            var userPhone = prompt("Nhập Số Điện thoại truy cập:", "");
+            userPhone = userPhone ? userPhone.trim() : "";
+            var userPass = prompt("Nhập Mật khẩu bảo mật:", "");
+            userPass = userPass ? userPass.trim() : "";
+            
+            var account = null;
+            for (var i = 0; i < allowedUsers.length; i++) {
+                if (allowedUsers[i].phone === userPhone && allowedUsers[i].password === userPass) {
+                    account = allowedUsers[i];
+                    break;
+                }
+            }
+            
+            if (!account) {
+                alert("Đăng nhập thất bại! Tài khoản sai, hoặc mật khẩu sai, hoặc đã bị Khóa.");
+                document.getElementById("map").style.display = "none";
+                return;
+            }
+            
+            if (account.role.toLowerCase() === "admin") {
+                alert("Xin chào Admin! Bản đồ đang được tải...");
+            } else {
+                var currentClientDeviceId = getOrCreateDeviceId();
+                var currentClientDeviceInfo = getBrowserAndOS();
+                
+                if (account.savedDeviceId !== "") {
+                    if (account.savedDeviceId !== currentClientDeviceId) {
+                        alert("LỖI: Tài khoản này đã được đăng ký cố định trên thiết bị khác!");
+                        document.getElementById("map").style.display = "none";
+                        return;
+                    }
+                } else {
+                    alert("Kích hoạt bảo mật thiết bị này lần đầu tiên...");
+                    fetch(webAppUrl, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            action: "register_device",
+                            phone: userPhone,
+                            device_info: currentClientDeviceInfo,
+                            device_id: currentClientDeviceId
+                        })
+                    });
+                }
+            }
+
+            plots.forEach(function(item) {
+                if (!item.wkt) return;
+                var coords = wktToCoords(item.wkt);
+                var p = item.properties;
+                var mauSac = getMauTheoLoaiDat(p.loai_dat);
+                
+                var polygon = L.polygon(coords, { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 }).addTo(map);
+                var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
+
+                var popupContent = "<table class='popup-table'>" +
+                    "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
+                    "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
+                    "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + check(p.so_thua) + "</span></td></tr>" +
+                    "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(p.dien_tich) + "</td></tr>" +
+                    "<tr><td><b>Loại đất</b></td><td><span class='popup-value'><b>" + check(p.loai_dat) + "</b></span></td></tr>" +
+                    "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
+                    "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
+                    "</table>";
+
+                polygon.bindPopup(popupContent, { maxWidth: 250 });
+            });
+        })
+        .catch(error => console.error('Hệ thống trục trặc:', error));
+</script>
+</body>
+</html>
+
+
