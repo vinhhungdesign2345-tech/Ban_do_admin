@@ -147,6 +147,10 @@
                     alert("Kích hoạt bảo mật thiết bị này lần đầu tiên...");
                     
                     // Gửi POST dạng text/plain để né bộ kiểm tra chặn CORS khắt khe của Google
+                    
+                    alert("Đang gửi đăng ký thiết bị...");
+                    console.log("Đang gửi register_device");
+                   
                     fetch(webAppUrl, {
                         method: "POST",
                         headers: { "Content-Type": "text/plain;charset=utf-8" },
