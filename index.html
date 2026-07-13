@@ -98,24 +98,35 @@
         });
     }
 
-    // LUỒNG XỬ LÝ ĐĂNG NHẬP HỢP NHẤT (ĐÃ KHẮC PHỤC LỖI KHÔNG PING)
+    // LUỒNG XỬ LÝ ĐĂNG NHẬP HỢP NHẤT
+    fetch(webAppUrl)
+        .then(response => response.json())
+        .then(res => {
+            var allowedUsers = res.allowedUsers || [];
+            var plots = res.plots || [];
+            
+            var userPhone = prompt("Nhập Số Điện thoại truy cập:", "");
+            userPhone = userPhone ? userPhone.trim() : "";
+            var userPass = prompt("Nhập Mật khẩu bảo mật:", "");
+            userPass = userPass ? userPass.trim() : "";
+            
+            var account = null;
+            for (var i = 0; i < allowedUsers.length; i++) {
+                if (allowedUsers[i].phone === userPhone && allowedUsers[i].password === userPass) {
+                    account = allowedUsers[i];
+                    break;
+                }
+            }
+            
             if (!account) {
                 alert("Đăng nhập thất bại! Tài khoản sai, hoặc mật khẩu sai, hoặc đã bị Khóa.");
                 document.getElementById("map").style.display = "none";
                 return;
             }
             
-            // Xử lý quyền Admin
             if (account.role.toLowerCase() === "admin") {
-                console.log("Admin đăng nhập thành công.");
-                // Chạy Ping ngay lập tức trước rồi mới hiện alert sau để tránh bị trình duyệt chặn
-                startPingInterval(userPhone); 
-                setTimeout(function() {
-                    alert("Xin chào Admin! Bản đồ đang được tải...");
-                }, 100);
-            } 
-            // Xử lý quyền Khách
-            else {
+                alert("Xin chào Admin! Bản đồ đang được tải...");
+            } else {
                 var currentClientDeviceId = getOrCreateDeviceId();
                 var currentClientDeviceInfo = getBrowserAndOS();
                 
@@ -125,9 +136,8 @@
                         document.getElementById("map").style.display = "none";
                         return;
                     }
-                    startPingInterval(userPhone); 
                 } else {
-                    // Đăng ký thiết bị mới
+                    alert("Kích hoạt bảo mật thiết bị này lần đầu tiên...");
                     fetch(webAppUrl, {
                         method: "POST",
                         mode: "no-cors",
@@ -138,14 +148,7 @@
                             device_info: currentClientDeviceInfo,
                             device_id: currentClientDeviceId
                         })
-                    }).then(function() {
-                        startPingInterval(userPhone);
-                    }).catch(function() {
-                        // Kể cả lỗi mạng vẫn ép kích hoạt ping
-                        startPingInterval(userPhone);
                     });
-                    
-                    alert("Kích hoạt bảo mật thiết bị này lần đầu tiên...");
                 }
             }
 
