@@ -14,6 +14,23 @@
         .popup-table b { color: #333; font-weight: 600; }
         .popup-table tr:nth-child(even){background-color: #fafafa;}
         .popup-value { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        /* GIAO DIỆN Ô TÌM KIẾM HỢP NHẤT */
+        .search-container {
+            position: absolute; top: 20px; left: 60px; z-index: 1000;
+            background: white; padding: 6px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; gap: 6px;
+        }
+        .search-input {
+            width: 220px; height: 32px; border: 1px solid #ccc;
+            border-radius: 4px; padding: 0 8px; font-size: 13px; outline: none;
+        }
+        .search-button {
+            background: #007bff; color: white; border: none; padding: 0 12px;
+            border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;
+        }
+        .search-button:hover { background: #0056b3; }
+
         .gps-button {
             position: absolute; bottom: 30px; right: 20px; z-index: 1000;
             background: white; border: none; width: 50px; height: 50px;
@@ -23,22 +40,27 @@
     </style>
 </head>
 <body>
+
+<!-- KHUNG TÌM KIẾM TRÊN BẢN ĐỒ -->
+<div class="search-container">
+    <input type="text" id="searchKey" class="search-input" placeholder="Nhập tờ/thửa (vd: 10/25) hoặc tên chủ...">
+    <button class="search-button" onclick="searchPlot()">Tìm</button>
+</div>
+
 <div id="map"></div>
 <button class="gps-button" onclick="findMyLocation()">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2.5"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1" fill="#007bff"></circle><line x1="12" y1="1" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="23"></line><line x1="1" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="23" y2="12"></line></svg>
 </button>
 
 <script>
-    // =========================================================================
-    // ⚠️ QUAN TRỌNG: ĐƯỜNG LINK WEB APP GOOGLE APPS SCRIPT CỦA BẠN
-    // =========================================================================
     var webAppUrl = "https://script.google.com/macros/s/AKfycbyXKmoC9cWo0kITyguVpc-eTbp_imGagxzi4vpyKe9nOXiql63Vf-z_-hzUGKt_T1zR/exec";
 
     var map = L.map('map').setView([10.25, 105.18], 13);
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
 
     var userMarker, userCircle, currentLatLng = null;
-    var thuaDatDangChon = null; // Biến ghi nhớ thửa đất đang được click sáng
+    var cacThuaDatDangSang = []; // Mảng chứa danh sách các thửa đang được highlight sáng
+    var tatCaLayerThuaDat = [];
 
     function updateLocationMarker(lat, lng, accuracy) {
         currentLatLng = L.latLng(lat, lng);
@@ -99,6 +121,87 @@
         });
     }
 
+    function xoaDauTiengViet(str) {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/đ/g, "d").trim();
+    }
+
+    // HÀM XÓA HIGHLIGHT TẤT CẢ CÁC THỬA ĐANG SÁNG CŨ
+    function xoaTatCaHighlightCu() {
+        cacThuaDatDangSang.forEach(function(lyr) {
+            lyr.setStyle(lyr.options.originalStyle);
+        });
+        cacThuaDatDangSang = [];
+    }
+
+    // HÀM LÀM SÁNG MỘT THỬA ĐẤT CỤ THỂ
+    function highlightThuaDat(polygon) {
+        polygon.setStyle({
+            weight: 3.5,
+            color: '#ffeb3b',
+            fillColor: '#ff5722',
+            fillOpacity: 0.7
+        });
+        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+            polygon.bringToFront();
+        }
+        cacThuaDatDangSang.push(polygon);
+    }
+
+    // HÀM XỬ LÝ TÌM KIẾM ĐA THỬA ĐẤT TRÊN BẢN ĐỒ
+    function searchPlot() {
+        var input = document.getElementById("searchKey").value.trim();
+        if (!input) { alert("Vui lòng nhập từ khóa tìm kiếm!"); return; }
+
+        var inputLoaiBoDau = xoaDauTiengViet(input);
+        var cacThuaTimThay = [];
+
+        // Quét qua toàn bộ layer để gom tất cả các thửa khớp từ khóa
+        for (var i = 0; i < tatCaLayerThuaDat.length; i++) {
+            var lyr = tatCaLayerThuaDat[i];
+            var p = lyr.customProperties;
+
+            var soTo = String(p.so_to || "");
+            var soThua = String(p.so_thua || "");
+            var tenChu = xoaDauTiengViet(p.ten_chu || "");
+
+            if (input.includes("/")) {
+                var parts = input.split("/");
+                if (soTo === parts[0].trim() && soThua === parts[1].trim()) { cacThuaTimThay.push(lyr); break; }
+            } else if (soThua === input || soTo === input || tenChu.includes(inputLoaiBoDau)) {
+                cacThuaTimThay.push(lyr);
+            }
+        }
+
+        if (cacThuaTimThay.length > 0) {
+            // 1. Tắt độ sáng của các thửa đã tìm kiếm đợt trước
+            xoaTatCaHighlightCu();
+
+            // 2. Tạo một khung bao tổng (FeatureGroup) chứa tất cả các thửa tìm thấy
+            var group = L.featureGroup(cacThuaTimThay);
+
+            // 3. Làm sáng đồng loạt tất cả các thửa đất tìm thấy
+            cacThuaTimThay.forEach(function(polygon) {
+                highlightThuaDat(polygon);
+            });
+
+            // 4. Phóng tầm nhìn bản đồ bao trọn toàn bộ các thửa đất này
+            map.fitBounds(group.getBounds(), { maxZoom: 18, padding: [30, 30] });
+
+            // Nếu chỉ tìm thấy đúng 1 thửa (ví dụ gõ số tờ/thửa), tự động bật bảng thông tin thửa đó lên luôn
+            if (cacThuaTimThay.length === 1) {
+                cacThuaTimThay[0].openPopup();
+            } else {
+                alert("Tìm thấy " + cacThuaTimThay.length + " thửa đất thuộc từ khóa này. Hệ thống đã khoanh vùng tất cả!");
+            }
+        } else {
+            alert("Không tìm thấy thửa đất nào khớp với từ khóa của bạn!");
+        }
+    }
+
+    document.getElementById("searchKey").addEventListener("keypress", function(e) {
+        if (e.key === 'Enter') { searchPlot(); }
+    });
+
     // LUỒNG XỬ LÝ ĐĂNG NHẬP VÀ XÁC THỰC THIẾT BỊ HỢP NHẤT
     fetch(webAppUrl)
         .then(response => response.json())
@@ -131,8 +234,8 @@
                 return;
             }
             
-            // Hàm phụ hỗ trợ vẽ bản đồ trực tiếp
             function renderMapPlots() {
+                tatCaLayerThuaDat = []; 
                 plots.forEach(function(item) {
                     if (!item.wkt) return;
                     var coords = wktToCoords(item.wkt);
@@ -141,8 +244,9 @@
                     
                     var polygon = L.polygon(coords, { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 }).addTo(map);
                     
-                    // Lưu cấu trúc màu gốc trực tiếp vào đối tượng polygon để khôi phục khi cần
                     polygon.options.originalStyle = { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 };
+                    polygon.customProperties = p; 
+                    tatCaLayerThuaDat.push(polygon); 
 
                     var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
 
@@ -160,37 +264,16 @@
 
                     polygon.bindPopup(popupContent, { maxWidth: 250 });
 
-                    // BẮT SỰ KIỆN CLICK ĐỂ LÀM SÁNG THỬA ĐẤT ĐANG CHỌN
+                    // Khi bấm thủ công vào một thửa cụ thể trên bản đồ
                     polygon.on('click', function(e) {
-                        // 1. Nếu có thửa đất trước đó đang sáng, trả nó về màu gốc ban đầu
-                        if (thuaDatDangChon && thuaDatDangChon !== polygon) {
-                            thuaDatDangChon.setStyle(thuaDatDangChon.options.originalStyle);
-                        }
-
-                        // 2. Làm sáng bừng thửa đất vừa nhấp (Viền vàng chanh dày, ruột đỏ cam neon phát sáng)
-                        polygon.setStyle({
-                            weight: 3.5,
-                            color: '#ffeb3b',
-                            fillColor: '#ff5722',
-                            fillOpacity: 0.7
-                        });
-
-                        // 3. Đẩy thửa đất lên trên cùng để viền sáng không bị thửa khác đè đứt đoạn
-                        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-                            polygon.bringToFront();
-                        }
-
-                        // 4. Ghi nhớ thửa đất hiện tại
-                        thuaDatDangChon = polygon;
+                        xoaTatCaHighlightCu();
+                        highlightThuaDat(polygon);
                     });
                 });
 
-                // TỰ ĐỘNG KHÔI PHỤC MÀU KHI POPUP ĐÓNG (Bấm ra khoảng không bản đồ)
+                // Khôi phục lại màu cũ khi bấm đóng popup hoặc bấm ra ngoài khoảng trống
                 map.on('popupclose', function() {
-                    if (thuaDatDangChon) {
-                        thuaDatDangChon.setStyle(thuaDatDangChon.options.originalStyle);
-                        thuaDatDangChon = null;
-                    }
+                    xoaTatCaHighlightCu();
                 });
             }
 
