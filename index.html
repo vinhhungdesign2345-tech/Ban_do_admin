@@ -38,6 +38,7 @@
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
 
     var userMarker, userCircle, currentLatLng = null;
+    var thuaDatDangChon = null; // Biến ghi nhớ thửa đất đang được click sáng
 
     function updateLocationMarker(lat, lng, accuracy) {
         currentLatLng = L.latLng(lat, lng);
@@ -139,6 +140,10 @@
                     var mauSac = getMauTheoLoaiDat(p.loai_dat);
                     
                     var polygon = L.polygon(coords, { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 }).addTo(map);
+                    
+                    // Lưu cấu trúc màu gốc trực tiếp vào đối tượng polygon để khôi phục khi cần
+                    polygon.options.originalStyle = { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 };
+
                     var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
 
                     var popupContent = "<table class='popup-table'>" +
@@ -154,6 +159,38 @@
                       "</table>";
 
                     polygon.bindPopup(popupContent, { maxWidth: 250 });
+
+                    // BẮT SỰ KIỆN CLICK ĐỂ LÀM SÁNG THỬA ĐẤT ĐANG CHỌN
+                    polygon.on('click', function(e) {
+                        // 1. Nếu có thửa đất trước đó đang sáng, trả nó về màu gốc ban đầu
+                        if (thuaDatDangChon && thuaDatDangChon !== polygon) {
+                            thuaDatDangChon.setStyle(thuaDatDangChon.options.originalStyle);
+                        }
+
+                        // 2. Làm sáng bừng thửa đất vừa nhấp (Viền vàng chanh dày, ruột đỏ cam neon phát sáng)
+                        polygon.setStyle({
+                            weight: 3.5,
+                            color: '#ffeb3b',
+                            fillColor: '#ff5722',
+                            fillOpacity: 0.7
+                        });
+
+                        // 3. Đẩy thửa đất lên trên cùng để viền sáng không bị thửa khác đè đứt đoạn
+                        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                            polygon.bringToFront();
+                        }
+
+                        // 4. Ghi nhớ thửa đất hiện tại
+                        thuaDatDangChon = polygon;
+                    });
+                });
+
+                // TỰ ĐỘNG KHÔI PHỤC MÀU KHI POPUP ĐÓNG (Bấm ra khoảng không bản đồ)
+                map.on('popupclose', function() {
+                    if (thuaDatDangChon) {
+                        thuaDatDangChon.setStyle(thuaDatDangChon.options.originalStyle);
+                        thuaDatDangChon = null;
+                    }
                 });
             }
 
@@ -170,11 +207,9 @@
                         document.getElementById("map").style.display = "none";
                         return;
                     }
-                    // Khách đăng nhập các lần sau đúng:
                     alert("Tài khoản hợp lệ - BẢN ĐỒ ĐÃ MỞ");
                     renderMapPlots();
                 } else {
-                    // Khách đăng nhập LẦN ĐẦU TIÊN: Gửi lệnh liên kết lên Google Sheets
                     fetch(webAppUrl, {
                         method: "POST",
                         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -188,7 +223,6 @@
                     .then(r => r.json())
                     .then(data => {
                         if(data.status === "success") {
-                            // Hiện thông báo thành công duy nhất rồi mở luôn map, không tải lại trang!
                             alert("Kích hoạt Tài khoản Thành công - BẢN ĐỒ ĐÃ MỞ");
                             renderMapPlots();
                         } else {
