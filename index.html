@@ -54,7 +54,6 @@
             cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
 
-        /* ĐỊNH DẠNG CHỮ TÊN PHƯỜNG CO GIÃN THEO ZOOM */
         .svg-ward-label {
             font-family: Arial, sans-serif;
             font-weight: 900;
@@ -91,13 +90,6 @@
 
 <script>
     var webAppUrl = "https://script.google.com/macros/s/AKfycbyXKmoC9cWo0kITyguVpc-eTbp_imGagxzi4vpyKe9nOXiql63Vf-z_-hzUGKt_T1zR/exec";
-
-    // =========================================================================
-    // 🔴 CHẾ ĐỘ HOẠT ĐỘNG (MODE)
-    // - Đặt = 'admin' : Mở thẳng bản đồ (Dành cho bạn dùng)
-    // - Đặt = 'login' : Hỏi SĐT & Mật khẩu (Dành cho khách/nhân viên)
-    // =========================================================================
-    var MODE = 'admin'; 
 
     var map = L.map('map').setView([10.25, 105.18], 13);
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
@@ -205,7 +197,6 @@
         }
     }
 
-    // TẢI CÁC PHƯỜNG GEOJSON
     fetch('hoa-thanh.geojson')
         .then(response => response.json())
         .then(data => {
@@ -325,38 +316,63 @@
         if (e.key === 'Enter') { searchPlot(); }
     });
 
-
     // =========================================================================
-    // 🔒 KHỐI XÁC THỰC BẢO MẬT VỚI SERVER (GOOGLE APPS SCRIPT)
+    // 🔒 KHỐI XÁC THỰC TỰ ĐỘNG + GHI NHẬN THIẾT BỊ VÀO CỘT F
     // =========================================================================
-    var requestUrl = webAppUrl;
+    var savedPhone = localStorage.getItem("sys_u_phone");
+    var savedPass = localStorage.getItem("sys_u_pass");
 
-    if (MODE === 'admin') {
-        requestUrl += "?mode=admin";
-    } else {
-        var userPhone = prompt("Vui lòng nhập SĐT đã đăng ký:", "");
-        var userPass = prompt("Vui lòng nhập mật khẩu được cấp:", "");
-        
-        userPhone = userPhone ? userPhone.trim() : "";
-        userPass = userPass ? userPass.trim() : "";
+    // Nếu chưa từng nhập trên thiết bị này -> Hỏi SĐT và Mật khẩu
+    if (!savedPhone || !savedPass) {
+        savedPhone = prompt("Vui lòng nhập Số điện thoại đã đăng ký:", "");
+        savedPass = prompt("Vui lòng nhập Mật khẩu:", "");
 
-        requestUrl += "?mode=login&phone=" + encodeURIComponent(userPhone) + "&pass=" + encodeURIComponent(userPass);
+        if (savedPhone && savedPass) {
+            savedPhone = savedPhone.trim();
+            savedPass = savedPass.trim();
+            localStorage.setItem("sys_u_phone", savedPhone);
+            localStorage.setItem("sys_u_pass", savedPass);
+        }
     }
 
-    // Tải dữ liệu từ Server
+    // Tạo ID cố định duy nhất cho thiết bị này nếu chưa có
+    var deviceId = localStorage.getItem("sys_device_id");
+    if (!deviceId) {
+        deviceId = "DEV_" + Math.random().toString(36).substr(2, 9).toUpperCase();
+        localStorage.setItem("sys_device_id", deviceId);
+    }
+    var deviceInfo = (navigator.userAgentData && navigator.userAgentData.platform) ? navigator.userAgentData.platform : navigator.platform;
+
+    // Gửi yêu cầu xác thực
+    var requestUrl = webAppUrl + "?phone=" + encodeURIComponent(savedPhone || "") + "&pass=" + encodeURIComponent(savedPass || "");
+
     fetch(requestUrl)
         .then(response => response.json())
         .then(res => {
-            // Nếu Server báo lỗi (Sai pass hoặc bị khóa account)
+            // Trường hợp: Sai SĐT/Pass HOẶC Tài khoản đang ở trạng thái "Khóa"
             if (res.status === "error") {
                 alert(res.message);
+                localStorage.removeItem("sys_u_phone");
+                localStorage.removeItem("sys_u_pass");
                 document.getElementById("map").style.display = "none";
                 return;
             }
 
-            var plots = res.plots || [];
+            // Ghi nhận thiết bị vào Cột F (Google Sheet)
+            fetch(webAppUrl, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "register_device",
+                    phone: savedPhone,
+                    device_info: deviceInfo,
+                    device_id: deviceId
+                })
+            }).catch(e => console.log("Lỗi ghi thiết bị:", e));
 
-            // VẼ TOÀN BỘ THỬA ĐẤT LÊN BẢN ĐỒ
+            // Vẽ toàn bộ thửa đất khi xác thực thành công
+            var plots = res.plots || [];
             tatCaLayerThuaDat = []; 
             plots.forEach(function(item) {
                 if (!item.wkt) return;
