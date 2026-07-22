@@ -58,29 +58,69 @@
     var map = L.map('map').setView([10.25, 105.18], 13);
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
 
-    // ==========================================
-    // ĐOẠN CODE MỚI: TẢI ĐƯỜNG BAO PHƯỜNG HÒA THÀNH
-    // ==========================================
+    // =========================================================================
+    // 1. TẠO NHÓM QUẢN LÝ RANH GIỚI VÀ NÚT BẬT/TẮT (LAYER CONTROL)
+    // =========================================================================
+    var layerNhomPhuong = L.layerGroup().addTo(map); // Nhóm chứa tất cả ranh giới Phường/Xã
+
+    var overlayLayers = {
+        " Ranh giới Phường/Xã": layerNhomPhuong
+    };
+    // Hiển thị bảng chọn ở góc trên bên phải màn hình
+    L.control.layers(null, overlayLayers, { collapsed: false, position: 'topright' }).addTo(map);
+
+
+    // =========================================================================
+    // 2. KHU VỰC TẢI RANH GIỚI CÁC PHƯỜNG / XÃ (TỰ ĐỘNG THÊM VÀO BẢN ĐỒ)
+    // =========================================================================
+    
+    // --- PHƯỜNG HÒA THÀNH ---
     fetch('hoa-thanh.geojson')
         .then(response => response.json())
         .then(data => {
             var layerHoaThanh = L.geoJSON(data, {
                 style: {
-                    color: "#007bff",       // Đường viền xanh dương nổi bật (giống Guland)
-                    weight: 3.5,            // Độ dầy viền
+                    color: "#007bff",       // Đường viền màu xanh dương
+                    weight: 3.5,            // Độ dầy đường viền
                     opacity: 0.9,           // Độ đậm nét
                     fillColor: "#007bff",   
-                    fillOpacity: 0.05,      // Nhạt để xem rõ các thửa đất bên dưới
-                    interactive: false      // Bấm xuyên qua được các thửa đất nhỏ bên trong
+                    fillOpacity: 0.05,      // Nhạt để xem rõ các thửa đất ở dưới
+                    interactive: false      // Cho phép bấm xuyên qua các thửa đất bên trong
                 }
-            }).addTo(map);
+            }).addTo(layerNhomPhuong);      // Đưa vào nhóm layerNhomPhuong để bật/tắt
 
-            // Tự động căn bản đồ vừa vặn với Phường Hòa Thành
-            map.fitBounds(layerHoaThanh.getBounds());
+            map.fitBounds(layerHoaThanh.getBounds()); // Căn bản đồ vừa vặn Phường Hòa Thành
         })
         .catch(err => console.error("Chưa đọc được file hoa-thanh.geojson:", err));
-    // ==========================================
 
+
+    /* =========================================================================
+       👉 HƯỚNG DẪN THÊM PHƯỜNG / XÃ MỚI SAU NÀY:
+       -------------------------------------------------------------------------
+       Bước 1: Upload file geojson mới lên GitHub (VD: dinh-thanh.geojson)
+       Bước 2: Copy đoạn code bên dưới, dán vào ngay dưới Phường Hòa Thành:
+
+       fetch('dinh-thanh.geojson')
+           .then(response => response.json())
+           .then(data => {
+               L.geoJSON(data, {
+                   style: {
+                       color: "#28a745",    // Màu viền (xanh lá, đỏ #dc3545, v.v...)
+                       weight: 3.5,
+                       opacity: 0.9,
+                       fillColor: "#28a745",
+                       fillOpacity: 0.05,
+                       interactive: false
+                   }
+               }).addTo(layerNhomPhuong);   // <--- Bắt buộc phải có dòng này!
+           })
+           .catch(err => console.error("Lỗi tải file mới:", err));
+       ========================================================================= */
+
+
+    // =========================================================================
+    // 3. XỬ LÝ ĐỊNH VỊ VÀ TÌM KIẾM THỬA ĐẤT
+    // =========================================================================
     var userMarker, userCircle, currentLatLng = null;
     var cacThuaDatDangSang = [];
     var tatCaLayerThuaDat = [];
@@ -198,7 +238,7 @@
         if (e.key === 'Enter') { searchPlot(); }
     });
 
-    // BỎ QUA XÁC THỰC - LẤY DỮ LIỆU VÀ MỞ BẢN ĐỒ TRỰC TIẾP
+    // LẤY DỮ LIỆU THỬA ĐẤT TỪ GOOGLE SHEETS
     fetch(webAppUrl)
         .then(response => response.json())
         .then(res => {
