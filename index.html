@@ -320,13 +320,73 @@
     });
 
     // =========================================================================
-    // 🔒 KHỐI XÁC THỰC BẢO MẬT KHÓA THIẾT BỊ VÀ ADMIN LẦN ĐẦU
-    // =========================================================================
-    var deviceId = generateDeviceFingerprint();
+// 🔒 HÀM TRÍCH XUẤT THÔNG TIN THIẾT BỊ TOÀN DIỆN (FULL DEVICE FINGERPRINT)
+// =========================================================================
+async function getFullDeviceFingerprint() {
+    var details = [];
+
+    // 1. Hệ điều hành & Trình duyệt
+    details.push("UA: " + navigator.userAgent);
+    details.push("Lang: " + (navigator.languages ? navigator.languages.join(',') : navigator.language));
+
+    // 2. Màn hình & Múi giờ
+    details.push("Screen: " + screen.width + "x" + screen.height + "x" + screen.colorDepth);
+    details.push("TZ: " + new Date().getTimezoneOffset());
+
+    // 3. Cấu hình Phần cứng (CPU & RAM)
+    details.push("CPU Cores: " + (navigator.hardwareConcurrency || 'N/A'));
+    details.push("RAM: " + (navigator.deviceMemory ? navigator.deviceMemory + 'GB' : 'N/A'));
+    details.push("TouchPoints: " + (navigator.maxTouchPoints || 0));
+
+    // 4. Card màn hình (GPU / WebGL Vendor & Renderer)
+    try {
+        var canvas = document.createElement('canvas');
+        var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (gl) {
+            var debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (debugInfo) {
+                var vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+                var renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                details.push("GPU: " + vendor + " | " + renderer);
+            }
+        }
+    } catch (e) {
+        details.push("GPU: Unknown");
+    }
+
+    // 5. Canvas Hash (Dấu vân tay thuật toán vẽ)
+    try {
+        var cvs = document.createElement('canvas');
+        var ctx = cvs.getContext('2d');
+        ctx.textBaseline = "top";
+        ctx.font = "14px 'Arial'";
+        ctx.fillStyle = "#f60";
+        ctx.fillRect(125,1,62,20);
+        ctx.fillStyle = "#069";
+        ctx.fillText("Guland_Auth_v3", 2, 15);
+        var cvsData = cvs.toDataURL();
+        var hash = 0;
+        for (var i = 0; i < cvsData.length; i++) {
+            hash = ((hash << 5) - hash) + cvsData.charCodeAt(i);
+            hash |= 0;
+        }
+        details.push("CvsHash: " + Math.abs(hash));
+    } catch(e) {}
+
+    // Ghép thành 1 chuỗi hoàn chỉnh để kiểm tra & lưu trữ
+    return details.join(" | ");
+}
+
+// =========================================================================
+// 🔒 KHỐI XÁC THỰC BẢO MẬT & ĐĂNG NHẬP
+// =========================================================================
+(async function initAuth() {
+    var fullDeviceDetails = await getFullDeviceFingerprint();
+
     var userPhone = "";
     var userPass = "";
 
-    // Kiểm tra xem đã lưu cấu hình Admin chưa
+    // Kiểm tra lưu vết Admin
     var savedAdminPhone = localStorage.getItem("admin_phone");
     var savedAdminPass = localStorage.getItem("admin_pass");
 
@@ -340,9 +400,11 @@
         userPass = userPass ? userPass.trim() : "";
     }
 
-    var requestUrl = webAppUrl + "?phone=" + encodeURIComponent(userPhone) + "&pass=" + encodeURIComponent(userPass) + "&device_id=" + encodeURIComponent(deviceId);
+    // Gửi toàn bộ thông tin chi tiết thiết bị lên Server
+    var requestUrl = webAppUrl + "?phone=" + encodeURIComponent(userPhone) 
+                    + "&pass=" + encodeURIComponent(userPass) 
+                    + "&device_id=" + encodeURIComponent(fullDeviceDetails);
 
-    // Tải dữ liệu từ Server
     fetch(requestUrl)
         .then(response => response.json())
         .then(res => {
@@ -354,12 +416,13 @@
                 return;
             }
 
-            // Nếu là Admin -> Lưu thông tin vào localStorage để lần sau không phải nhập
+            // Nếu là Admin -> Lưu lại để không cần nhập lần sau
             if (res.role === "admin") {
                 localStorage.setItem("admin_phone", userPhone);
                 localStorage.setItem("admin_pass", userPass);
             }
 
+            // Tiến hành vẽ bản đồ như bình thường...
             var plots = res.plots || [];
             tatCaLayerThuaDat = []; 
             plots.forEach(function(item) {
@@ -397,6 +460,7 @@
             });
         })
         .catch(error => console.error('Hệ thống trục trặc:', error));
+})();
 </script>
 </body>
 </html>
