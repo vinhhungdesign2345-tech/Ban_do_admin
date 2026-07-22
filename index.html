@@ -56,16 +56,17 @@
             cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
 
-        /* TÊN PHƯỜNG XÃ NỔI BẬT */
+        /* TÊN PHƯỜNG XÃ TỰ ĐỘNG THU NHỎ / PHÓNG TO THEO CO GIÃN MÀN HÌNH & ZOOM */
         .ward-label-text {
             background: transparent;
             border: none;
             box-shadow: none;
-            font-size: 16px;
+            font-size: clamp(10px, 1.2vw, 18px); /* Co giãn linh hoạt theo tỷ lệ thu nhỏ bản đồ */
             font-weight: 800;
             color: #0056b3;
-            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 8px #fff;
+            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 6px #fff;
             white-space: nowrap;
+            text-align: center;
         }
     </style>
 </head>
@@ -82,7 +83,8 @@
         <!-- Ô tích chọn hiện tất cả ranh giới nằm ngay bên cạnh -->
         <input type="checkbox" id="chkShowAll" class="show-all-checkbox" onchange="toggleShowAll(this.checked)" title="Tích chọn để hiện tất cả các Phường/Xã">
         <select id="wardSelect" class="ward-select" onchange="filterWard(this.value)">
-            <!-- Danh sách các Phường/Xã tự động được điền ở đây -->
+            <option value="">-- Trống --</option>
+            <!-- Danh sách các Phường/Xã tự động được điền thêm vào đây -->
         </select>
     </div>
 </div>
@@ -109,7 +111,8 @@
         danhSachPhuongXa.sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }));
 
         var selectElem = document.getElementById("wardSelect");
-        selectElem.innerHTML = '';
+        selectElem.innerHTML = '<option value="">-- Trống --</option>'; // Luôn giữ tùy chọn Trống ở đầu
+        
         danhSachPhuongXa.forEach(function(item) {
             var opt = document.createElement("option");
             opt.value = item.id;
@@ -117,10 +120,8 @@
             selectElem.appendChild(opt);
         });
 
-        // Tự động kích hoạt lọc theo mục chọn đầu tiên
-        if (danhSachPhuongXa.length > 0) {
-            filterWard(document.getElementById("wardSelect").value);
-        }
+        // Áp dụng bộ lọc ban đầu theo trạng thái mặc định (Trống)
+        filterWard(selectElem.value);
     }
 
     // Xử lý khi chọn 1 Phường/Xã cụ thể trong danh sách thả
@@ -130,18 +131,25 @@
         if (chkAll.checked) {
             // Nếu đang tích nút hiện tất cả -> Hiện toàn bộ các phường
             showAllWards();
-            var target = danhSachPhuongXa.find(item => item.id === selectedId);
-            if (target) map.fitBounds(target.layer.getBounds(), { padding: [30, 30] });
+            if (selectedId !== "") {
+                var target = danhSachPhuongXa.find(item => item.id === selectedId);
+                if (target) map.fitBounds(target.layer.getBounds(), { padding: [30, 30] });
+            }
         } else {
-            // Nếu không tích -> Chỉ hiện duy nhất 1 phường được chọn
-            danhSachPhuongXa.forEach(function(item) {
-                if (item.id === selectedId) {
-                    layerNhomPhuong.addLayer(item.layer);
-                    map.fitBounds(item.layer.getBounds(), { padding: [30, 30] });
-                } else {
-                    layerNhomPhuong.removeLayer(item.layer);
-                }
-            });
+            // Nếu chọn "Trống" -> Ẩn hết tất cả ranh giới
+            if (selectedId === "" || !selectedId) {
+                layerNhomPhuong.clearLayers();
+            } else {
+                // Nếu chọn 1 phường cụ thể -> Chỉ hiển thị duy nhất phường đó
+                danhSachPhuongXa.forEach(function(item) {
+                    if (item.id === selectedId) {
+                        layerNhomPhuong.addLayer(item.layer);
+                        map.fitBounds(item.layer.getBounds(), { padding: [30, 30] });
+                    } else {
+                        layerNhomPhuong.removeLayer(item.layer);
+                    }
+                });
+            }
         }
     }
 
@@ -192,15 +200,15 @@
                 icon: L.divIcon({
                     className: 'ward-label-text',
                     html: 'PHƯỜNG HÒA THÀNH',
-                    iconSize: [200, 30],
-                    iconAnchor: [100, 15]
+                    iconSize: [180, 25],
+                    iconAnchor: [90, 12]
                 }),
                 interactive: false
             }).addTo(subGroup);
 
             subGroup.getBounds = function() { return bounds; };
 
-            // Đưa vào danh sách thả & quản lý hiển thị
+            // Đưa vào danh sách quản lý
             addWardToList('hoa-thanh', 'Phường Hòa Thành', subGroup);
         })
         .catch(err => console.error("Chưa đọc được file hoa-thanh.geojson:", err));
@@ -209,7 +217,8 @@
     /* =========================================================================
        👉 HƯỚNG DẪN THÊM PHƯỜNG / XÃ MỚI SAU NÀY:
        -------------------------------------------------------------------------
-       Sao chép đoạn code dưới đây và sửa tên file + tên phường tương ứng:
+       Khi cần thêm Phường mới, bạn chỉ cần copy đoạn dưới đây, dán nối tiếp vào
+       và thay đổi tên file + tên hiển thị:
 
        fetch('dinh-thanh.geojson')
            .then(response => response.json())
@@ -224,8 +233,8 @@
                    icon: L.divIcon({
                        className: 'ward-label-text',
                        html: 'XÃ ĐỊNH THÀNH',
-                       iconSize: [200, 30],
-                       iconAnchor: [100, 15]
+                       iconSize: [180, 25],
+                       iconAnchor: [90, 12]
                    }),
                    interactive: false
                }).addTo(subGroup);
