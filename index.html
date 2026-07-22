@@ -319,25 +319,11 @@
     });
 
     // =========================================================================
-    // 🔴 CÔNG TẮC CHẾ ĐỘ PHÁT TRIỂN (DEV MODE)
-    // - Đặt = true : BỎ QUA ĐĂNG NHẬP (khi bạn cần sửa code/thử nghiệm)
-    // - Đặt = false: BẬT YÊU CẦU ĐĂNG NHẬP (khi gửi link cho khách)
-    // =========================================================================
-    var IS_DEV_MODE = true; 
-
-
-    fetch(webAppUrl)
-        .then(response => response.json())
-        .then(res => {
-            var allowedUsers = res.allowedUsers || [];
-            var plots = res.plots || [];
-            
-           // =========================================================================
     // 🔴 CHẾ ĐỘ HOẠT ĐỘNG (MODE)
-    // - Đặt = 'admin' : BỎ QUA ĐĂNG NHẬP (chế độ dành riêng cho bạn test/chỉnh sửa)
-    // - Đặt = 'login' : BẬT ĐĂNG NHẬP (chế độ khi gửi file/link cho khách hàng)
+    // - Đặt = 'admin' : BỎ QUA ĐĂNG NHẬP (mở bản đồ ngay lập tức)
+    // - Đặt = 'login' : BẬT ĐĂNG NHẬP (hỏi SĐT & Mật khẩu khi gửi cho khách)
     // =========================================================================
-    var MODE = 'login'; 
+    var MODE = 'admin'; 
 
 
     fetch(webAppUrl)
@@ -376,8 +362,6 @@
                 }
             }
             // =========================================================================
-
-            // VẼ TOÀN BỘ THỬA ĐẤT LÊN BẢN ĐỒ...
 
 
             // VẼ TOÀN BỘ THỬA ĐẤT LÊN BẢN ĐỒ
