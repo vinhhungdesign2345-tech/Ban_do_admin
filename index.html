@@ -56,13 +56,13 @@
             cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
 
-        /* ĐỊNH DẠNG CHỮ SVG HIỂN THỊ CHUẨN TỶ LỆ KHI ZOOM */
+        /* ĐỊNH DẠNG CHỮ TÊN PHƯỜNG MÀU TRẮNG CO GIÃN THEO ZOOM */
         .svg-ward-label {
             font-family: Arial, sans-serif;
             font-weight: 900;
-            fill: #0056b3;
-            stroke: #ffffff;
-            stroke-width: 0.6px;
+            fill: #ffffff;             /* Màu chữ trắng */
+            stroke: #003366;           /* Đường viền chữ màu xanh đậm để làm nổi bật trên nền vệ tinh */
+            stroke-width: 0.8px;
             paint-order: stroke fill;
             text-anchor: middle;
             dominant-baseline: central;
@@ -132,7 +132,7 @@
                 
                 // Tự động tính toán kích thước font chữ chuẩn theo Zoom Level thực tế
                 var currentZoom = map.getZoom();
-                var baseFontSize = Math.pow(2, currentZoom - 13) * 16; // Co giãn theo cấp số nhân chuẩn bản đồ
+                var baseFontSize = Math.pow(2, currentZoom - 13) * 16;
                 
                 this._text.setAttribute('font-size', baseFontSize + 'px');
             }
@@ -232,7 +232,7 @@
 
             var bounds = layerGeo.getBounds();
             
-            // Vẽ tên Phường bằng công nghệ SVG co giãn chuẩn
+            // Vẽ tên Phường bằng SVG màu trắng
             var labelSvg = createSvgLabel(bounds.getCenter(), 'PHƯỜNG HÒA THÀNH');
             labelSvg.addTo(subGroup);
 
