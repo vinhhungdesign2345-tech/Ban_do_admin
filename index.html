@@ -54,7 +54,7 @@
             cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
 
-        /* ĐỊNH DẠNG CHỮ TÊN PHƯỜNG MÀU TRẮNG CO GIÃN THEO ZOOM */
+        /* ĐỊNH DẠNG CHỮ TÊN PHƯỜNG CO GIÃN THEO ZOOM */
         .svg-ward-label {
             font-family: Arial, sans-serif;
             font-weight: 900;
@@ -91,6 +91,13 @@
 
 <script>
     var webAppUrl = "https://script.google.com/macros/s/AKfycbyXKmoC9cWo0kITyguVpc-eTbp_imGagxzi4vpyKe9nOXiql63Vf-z_-hzUGKt_T1zR/exec";
+
+    // =========================================================================
+    // 🔴 CHẾ ĐỘ HOẠT ĐỘNG (MODE)
+    // - Đặt = 'admin' : Mở thẳng bản đồ (Dành cho bạn dùng)
+    // - Đặt = 'login' : Hỏi SĐT & Mật khẩu (Dành cho khách/nhân viên)
+    // =========================================================================
+    var MODE = 'admin'; 
 
     var map = L.map('map').setView([10.25, 105.18], 13);
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
@@ -318,51 +325,36 @@
         if (e.key === 'Enter') { searchPlot(); }
     });
 
-    // =========================================================================
-    // 🔴 CHẾ ĐỘ HOẠT ĐỘNG (MODE)
-    // - Đặt = 'admin' : BỎ QUA ĐĂNG NHẬP (mở bản đồ ngay lập tức)
-    // - Đặt = 'login' : BẬT ĐĂNG NHẬP (hỏi SĐT & Mật khẩu khi gửi cho khách)
-    // =========================================================================
-    var MODE = 'admin'; 
 
+    // =========================================================================
+    // 🔒 KHỐI XÁC THỰC BẢO MẬT VỚI SERVER (GOOGLE APPS SCRIPT)
+    // =========================================================================
+    var requestUrl = webAppUrl;
 
-    fetch(webAppUrl)
+    if (MODE === 'admin') {
+        requestUrl += "?mode=admin";
+    } else {
+        var userPhone = prompt("Vui lòng nhập SĐT đã đăng ký:", "");
+        var userPass = prompt("Vui lòng nhập mật khẩu được cấp:", "");
+        
+        userPhone = userPhone ? userPhone.trim() : "";
+        userPass = userPass ? userPass.trim() : "";
+
+        requestUrl += "?mode=login&phone=" + encodeURIComponent(userPhone) + "&pass=" + encodeURIComponent(userPass);
+    }
+
+    // Tải dữ liệu từ Server
+    fetch(requestUrl)
         .then(response => response.json())
         .then(res => {
-            var allowedUsers = res.allowedUsers || [];
-            var plots = res.plots || [];
-            
-            // =========================================================================
-            // 🟢 [KHỐI ĐĂNG NHẬP - CHỈ CHẠY KHI MODE === 'login']
-            // =========================================================================
-            if (MODE === 'login') {
-                var userPhone = prompt("Vui lòng nhập SĐT đã đăng ký:", "");
-                userPhone = userPhone ? userPhone.trim() : "";
-                var userPass = prompt("Vui lòng nhập mật khẩu được cấp:", "");
-                userPass = userPass ? userPass.trim() : "";
-                
-                var account = null;
-                var cleanPhoneInput = userPhone.replace(/[^0-9]/g, "");
-                if (!cleanPhoneInput.startsWith("0") && cleanPhoneInput !== "") cleanPhoneInput = "0" + cleanPhoneInput;
-
-                for (var i = 0; i < allowedUsers.length; i++) {
-                    var cleanAllowedPhone = allowedUsers[i].phone.replace(/[^0-9]/g, "");
-                    if (!cleanAllowedPhone.startsWith("0")) cleanAllowedPhone = "0" + cleanAllowedPhone;
-
-                    if (cleanAllowedPhone === cleanPhoneInput && allowedUsers[i].password === userPass) {
-                        account = allowedUsers[i];
-                        break;
-                    }
-                }
-                
-                if (!account) {
-                    alert("Đăng nhập thất bại!");
-                    document.getElementById("map").style.display = "none";
-                    return;
-                }
+            // Nếu Server báo lỗi (Sai pass hoặc bị khóa account)
+            if (res.status === "error") {
+                alert(res.message);
+                document.getElementById("map").style.display = "none";
+                return;
             }
-            // =========================================================================
 
+            var plots = res.plots || [];
 
             // VẼ TOÀN BỘ THỬA ĐẤT LÊN BẢN ĐỒ
             tatCaLayerThuaDat = []; 
@@ -388,6 +380,8 @@
                   "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
                   "<tr><td><b>Số định danh</b></td><td><span class='popup-value'>" + check(p.so_dinh_danh) + "</span></td></tr>" +
                   "<tr><td><b>Trạng thái</b></td><td><span class='popup-value'>" + check(p.trang_thai) + "</span></td></tr>" +
+                  "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + check(p.ngay_tao) + "</span></td></tr>" +
+                  "<tr><td><b>Cập nhật</b></td><td><span class='popup-value'>" + check(p.ngay_cap_nhat) + "</span></td></tr>" +
                   "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
                   "</table>";
 
