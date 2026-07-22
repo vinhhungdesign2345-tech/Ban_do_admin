@@ -332,10 +332,24 @@
             var allowedUsers = res.allowedUsers || [];
             var plots = res.plots || [];
             
+           // =========================================================================
+    // 🔴 CHẾ ĐỘ HOẠT ĐỘNG (MODE)
+    // - Đặt = 'admin' : BỎ QUA ĐĂNG NHẬP (chế độ dành riêng cho bạn test/chỉnh sửa)
+    // - Đặt = 'login' : BẬT ĐĂNG NHẬP (chế độ khi gửi file/link cho khách hàng)
+    // =========================================================================
+    var MODE = 'login'; 
+
+
+    fetch(webAppUrl)
+        .then(response => response.json())
+        .then(res => {
+            var allowedUsers = res.allowedUsers || [];
+            var plots = res.plots || [];
+            
             // =========================================================================
-            // 🟢 [KHỐI ĐĂNG NHẬP - BỎ QUA KHI IS_DEV_MODE = true]
+            // 🟢 [KHỐI ĐĂNG NHẬP - CHỈ CHẠY KHI MODE === 'login']
             // =========================================================================
-            if (!IS_DEV_MODE) {
+            if (MODE === 'login') {
                 var userPhone = prompt("Vui lòng nhập SĐT đã đăng ký:", "");
                 userPhone = userPhone ? userPhone.trim() : "";
                 var userPass = prompt("Vui lòng nhập mật khẩu được cấp:", "");
@@ -362,6 +376,8 @@
                 }
             }
             // =========================================================================
+
+            // VẼ TOÀN BỘ THỬA ĐẤT LÊN BẢN ĐỒ...
 
 
             // VẼ TOÀN BỘ THỬA ĐẤT LÊN BẢN ĐỒ
