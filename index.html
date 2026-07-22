@@ -1,202 +1,80 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-    <title>Bản Đồ Quản Lý Thực Địa</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quản Lý Bản Đồ Thửa Đất</title>
+    
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
-        html, body, #map { height: 100%; margin: 0; padding: 0; }
-        .leaflet-popup-content { margin: 8px 10px; line-height: 1.2; }
-        .popup-table { border-collapse: collapse; width: 100%; font-size: 11px; color: #444; }
-        .popup-table td { border: 1px solid #eee; padding: 2px 4px; vertical-align: top; }
-        .popup-table b { color: #333; font-weight: 600; }
-        .popup-table tr:nth-child(even){background-color: #fafafa;}
-        .popup-value { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        
-        .top-left-toolbar {
-            position: absolute; top: 15px; left: 60px; z-index: 1000;
-            display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-        }
-
-        .search-container {
-            background: white; padding: 5px 8px; border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; gap: 6px; align-items: center;
-        }
-        .search-input {
-            width: 180px; height: 30px; border: 1px solid #ccc;
-            border-radius: 4px; padding: 0 8px; font-size: 13px; outline: none;
-        }
-        .search-button {
-            background: #007bff; color: white; border: none; height: 32px; padding: 0 12px;
-            border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;
-        }
-        .search-button:hover { background: #0056b3; }
-
-        .ward-select-container {
-            background: white; padding: 5px 8px; border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 6px;
-            font-size: 13px; font-weight: bold;
-        }
-        .ward-select {
-            height: 30px; border: 1px solid #007bff; border-radius: 4px;
-            padding: 0 6px; font-size: 13px; color: #007bff; font-weight: bold; outline: none; cursor: pointer;
-        }
-        .show-all-checkbox {
-            width: 16px; height: 16px; cursor: pointer; accent-color: #007bff;
-        }
-
-        .gps-button {
-            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
-            background: white; border: none; width: 50px; height: 50px;
-            border-radius: 50%; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-        }
-
-        .svg-ward-label {
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
             font-family: Arial, sans-serif;
-            font-weight: 900;
-            fill: #ffffff;
-            stroke: #003366;
-            stroke-width: 0.8px;
-            paint-order: stroke fill;
-            text-anchor: middle;
-            dominant-baseline: central;
-            pointer-events: none;
+        }
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        .popup-table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 13px;
+        }
+        .popup-table td {
+            padding: 4px 6px;
+            border-bottom: 1px solid #ddd;
+        }
+        .popup-value {
+            color: #1a73e8;
+            word-break: break-word;
         }
     </style>
 </head>
 <body>
 
-<div class="top-left-toolbar">
-    <div class="search-container">
-        <input type="text" id="searchKey" class="search-input" placeholder="Tờ/thửa hoặc tên chủ...">
-        <button class="search-button" onclick="searchPlot()">Tìm</button>
-    </div>
+    <div id="map"></div>
 
-    <div class="ward-select-container">
-        <input type="checkbox" id="chkShowAll" class="show-all-checkbox" onchange="toggleShowAll(this.checked)" title="Tích chọn để hiện tất cả các Phường/Xã">
-        <select id="wardSelect" class="ward-select" onchange="filterWard(this.value)">
-            <option value="">-- Trống --</option>
-        </select>
-    </div>
-</div>
+    <!-- Leaflet JS & WKT Parser -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/wicket@1.3.8/wicket.js"></script>
 
-<div id="map"></div>
-<button class="gps-button" onclick="findMyLocation()">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2.5"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1" fill="#007bff"></circle><line x1="12" y1="1" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="23"></line><line x1="1" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="23" y2="12"></line></svg>
-</button>
+    <script>
+    // =========================================================================
+    // 1. CẤU HÌNH KHỞI TẠO BẢN ĐỒ
+    // =========================================================================
+    var webAppUrl = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE"; // Thay URL Apps Script của bạn tại đây
 
-<script>
-    var webAppUrl = "https://script.google.com/macros/s/AKfycbyXKmoC9cWo0kITyguVpc-eTbp_imGagxzi4vpyKe9nOXiql63Vf-z_-hzUGKt_T1zR/exec";
+    var map = L.map('map').setView([10.762622, 106.660172], 13); // Tọa độ trung tâm mặc định
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
 
-    var map = L.map('map').setView([10.25, 105.18], 13);
-    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+    var tatCaLayerThuaDat = [];
 
-    function createSvgLabel(centerLatLng, textString) {
-        var SvgLabelOverlay = L.Layer.extend({
-            onAdd: function(map) {
-                var pane = map.getPane('overlayPane');
-                this._container = L.DomUtil.create('div', 'leaflet-zoom-hide');
-                this._container.style.position = 'absolute';
-                this._container.style.pointerEvents = 'none';
-                
-                this._svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                this._svg.style.overflow = 'visible';
-                
-                this._text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                this._text.setAttribute('class', 'svg-ward-label');
-                this._text.textContent = textString;
-                
-                this._svg.appendChild(this._text);
-                this._container.appendChild(this._svg);
-                pane.appendChild(this._container);
-                
-                map.on('zoom zoomend viewreset move', this._update, this);
-                this._update();
-            },
-            onRemove: function(map) {
-                L.DomUtil.remove(this._container);
-                map.off('zoom zoomend viewreset move', this._update, this);
-            },
-            _update: function() {
-                var p = map.latLngToLayerPoint(centerLatLng);
-                L.DomUtil.setPosition(this._container, p);
-                
-                var currentZoom = map.getZoom();
-                var baseFontSize = Math.pow(2, currentZoom - 13) * 16;
-                this._text.setAttribute('font-size', baseFontSize + 'px');
-            }
+    // =========================================================================
+    // 2. TẢI VÀ HIỂN THỊ RANH GIỚI HÀNH CHÍNH (PHƯỜNG HÒA THÀNH)
+    // =========================================================================
+    function createSvgLabel(centerLatLng, labelText) {
+        var myIcon = L.divIcon({
+            className: 'custom-ward-label',
+            html: '<div style="color: #007bff; font-weight: bold; text-shadow: 1px 1px 2px white; white-space: nowrap;">' + labelText + '</div>',
+            iconSize: [100, 20],
+            iconAnchor: [50, 10]
         });
-
-        return new SvgLabelOverlay();
+        return L.marker(centerLatLng, { icon: myIcon, interactive: false });
     }
 
-    var layerNhomPhuong = L.layerGroup().addTo(map);
-    var danhSachPhuongXa = [];
-
-    function addWardToList(id, tenPhuong, layerGroup) {
-        danhSachPhuongXa.push({ id: id, name: tenPhuong, layer: layerGroup });
-        danhSachPhuongXa.sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }));
-
-        var selectElem = document.getElementById("wardSelect");
-        selectElem.innerHTML = '<option value="">-- Trống --</option>';
-        
-        danhSachPhuongXa.forEach(function(item) {
-            var opt = document.createElement("option");
-            opt.value = item.id;
-            opt.textContent = item.name;
-            selectElem.appendChild(opt);
-        });
-
-        filterWard(selectElem.value);
+    function addWardToList(id, name, groupLayer) {
+        groupLayer.addTo(map);
     }
 
-    function filterWard(selectedId) {
-        var chkAll = document.getElementById("chkShowAll");
-        
-        if (chkAll.checked) {
-            showAllWards();
-            if (selectedId !== "") {
-                var target = danhSachPhuongXa.find(item => item.id === selectedId);
-                if (target) map.fitBounds(target.layer.getBounds(), { padding: [30, 30] });
-            }
-        } else {
-            if (selectedId === "" || !selectedId) {
-                layerNhomPhuong.clearLayers();
-            } else {
-                danhSachPhuongXa.forEach(function(item) {
-                    if (item.id === selectedId) {
-                        layerNhomPhuong.addLayer(item.layer);
-                        map.fitBounds(item.layer.getBounds(), { padding: [30, 30] });
-                    } else {
-                        layerNhomPhuong.removeLayer(item.layer);
-                    }
-                });
-            }
-        }
-    }
-
-    function showAllWards() {
-        var allBounds = L.latLngBounds([]);
-        danhSachPhuongXa.forEach(function(item) {
-            layerNhomPhuong.addLayer(item.layer);
-            allBounds.extend(item.layer.getBounds());
-        });
-        return allBounds;
-    }
-
-    function toggleShowAll(isChecked) {
-        if (isChecked) {
-            var bounds = showAllWards();
-            if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
-        } else {
-            var currentSelect = document.getElementById("wardSelect").value;
-            filterWard(currentSelect);
-        }
-    }
-
+    // Tải file ranh giới GeoJSON Phường Hòa Thành
     fetch('hoa-thanh.geojson')
         .then(response => response.json())
         .then(data => {
@@ -214,115 +92,55 @@
         })
         .catch(err => console.error("Chưa đọc được file hoa-thanh.geojson:", err));
 
-    var userMarker, userCircle, currentLatLng = null;
-    var cacThuaDatDangSang = [];
-    var tatCaLayerThuaDat = [];
-
-    function updateLocationMarker(lat, lng, accuracy) {
-        currentLatLng = L.latLng(lat, lng);
-        if (userMarker) { map.removeLayer(userMarker); map.removeLayer(userCircle); }
-        userMarker = L.circleMarker(currentLatLng, { radius: 8, fillColor: '#007bff', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
-        userCircle = L.circle(currentLatLng, accuracy / 2, { color: '#007bff', fillColor: '#007bff', fillOpacity: 0.1, weight: 1 }).addTo(map);
-    }
-    if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(function(position) {
-            updateLocationMarker(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
-        }, function(e){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
-    }
-    function findMyLocation() {
-        if (currentLatLng) { map.setView(currentLatLng, 18); }
-        else { navigator.geolocation.getCurrentPosition(function(p) { updateLocationMarker(p.coords.latitude, p.coords.longitude, p.coords.accuracy); map.setView(currentLatLng, 18); }, function(e){}, { enableHighAccuracy: true }); }
-    }
-
-    function formatDienTich(val) {
-        if (val === undefined || val === null || val === "") return "";
-        var num = parseFloat(val);
-        if (!isNaN(num)) return new Intl.NumberFormat('vi-VN').format(num) + " m²";
-        return val;
+    // =========================================================================
+    // 3. CÁC HÀM HỖ TRỢ XỬ LÝ DỮ LIỆU BẢN ĐỒ
+    // =========================================================================
+    function wktToCoords(wktString) {
+        var wkt = new Wkt.Wkt();
+        wkt.read(wktString);
+        var obj = wkt.toObject();
+        if (obj && obj.getLatLngs) {
+            return obj.getLatLngs();
+        }
+        return [];
     }
 
     function getMauTheoLoaiDat(loaiDat) {
-        if (!loaiDat) return { color: "#666666", fillColor: "#888888" }; 
-        var txt = String(loaiDat).toLowerCase().trim().replace(/\s+/g, '');
-        txt = txt.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a").replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e").replace(/ì|í|ị|ỉ|ĩ/g, "i").replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o").replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u").replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y").replace(/đ/g, "d");
-        if (txt.includes("ont") || txt.includes("odt") || txt.includes("dato")) return { color: "#e74c3c", fillColor: "#ff7675" }; 
-        if (txt.includes("luc") || txt.includes("lnk") || txt.includes("lua")) return { color: "#f1c40f", fillColor: "#f5cd79" }; 
-        if (txt.includes("cln") || txt.includes("chn") || txt.includes("hnk") || txt.includes("cay")) return { color: "#d35400", fillColor: "#f39c12" }; 
-        if (txt.includes("nts") || txt.includes("thuysan")) return { color: "#2980b9", fillColor: "#3498db" }; 
-        return { color: "#7f8c8d", fillColor: "#bdc3c7" }; 
+        if (!loaiDat) return { color: "#3388ff", fillColor: "#3388ff" };
+        var l = loaiDat.toUpperCase();
+        if (l.includes("ONT") || l.includes("ODT")) return { color: "#ff0000", fillColor: "#ff4d4d" };
+        if (l.includes("CLN") || l.includes("NTS")) return { color: "#ff9900", fillColor: "#ffcc00" };
+        if (l.includes("LUC") || l.includes("LUK")) return { color: "#009933", fillColor: "#33cc33" };
+        return { color: "#3388ff", fillColor: "#3388ff" };
     }
 
-    function wktToCoords(wkt) {
-        var txt = wkt.replace("POLYGON((", "").replace("))", "");
-        return txt.split(",").map(function(p) {
-            var xy = p.trim().split(/\s+/);
-            return [parseFloat(xy[1]), parseFloat(xy[0])];
-        });
-    }
-
-    function xoaDauTiengViet(str) {
-        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/đ/g, "d").trim();
+    function formatDienTich(val) {
+        if (!val && val !== 0) return "";
+        return Number(val).toLocaleString('vi-VN') + " m²";
     }
 
     function xoaTatCaHighlightCu() {
-        cacThuaDatDangSang.forEach(function(lyr) {
-            lyr.setStyle(lyr.options.originalStyle);
-        });
-        cacThuaDatDangSang = [];
-    }
-
-    function highlightThuaDat(polygon) {
-        polygon.setStyle({ weight: 3.5, color: '#ffeb3b', fillColor: '#ff5722', fillOpacity: 0.7 });
-        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) { polygon.bringToFront(); }
-        cacThuaDatDangSang.push(polygon);
-    }
-
-    function searchPlot() {
-        var input = document.getElementById("searchKey").value.trim();
-        if (!input) { alert("Vui lòng nhập từ khóa tìm kiếm!"); return; }
-
-        var inputLoaiBoDau = xoaDauTiengViet(input);
-        var cacThuaTimThay = [];
-
-        for (var i = 0; i < tatCaLayerThuaDat.length; i++) {
-            var lyr = tatCaLayerThuaDat[i];
-            var p = lyr.customProperties;
-
-            var soTo = String(p.so_to || "");
-            var soThua = String(p.so_thua || "");
-            var tenChu = xoaDauTiengViet(p.ten_chu || "");
-
-            if (input.includes("/")) {
-                var parts = input.split("/");
-                if (soTo === parts[0].trim() && soThua === parts[1].trim()) { cacThuaTimThay.push(lyr); break; }
-            } else if (soThua === input || soTo === input || tenChu.includes(inputLoaiBoDau)) {
-                cacThuaTimThay.push(lyr);
+        tatCaLayerThuaDat.forEach(function(layer) {
+            if (layer.options.originalStyle) {
+                layer.setStyle(layer.options.originalStyle);
             }
-        }
-
-        if (cacThuaTimThay.length > 0) {
-            xoaTatCaHighlightCu();
-            var group = L.featureGroup(cacThuaTimThay);
-            cacThuaTimThay.forEach(function(polygon) { highlightThuaDat(polygon); });
-            map.fitBounds(group.getBounds(), { maxZoom: 18, padding: [30, 30] });
-            if (cacThuaTimThay.length === 1) { cacThuaTimThay[0].openPopup(); }
-            else { alert("Tìm thấy " + cacThuaTimThay.length + " thửa đất thuộc từ khóa này!"); }
-        } else {
-            alert("Không tìm thấy thửa đất nào!");
-        }
+        });
     }
 
-    document.getElementById("searchKey").addEventListener("keypress", function(e) {
-        if (e.key === 'Enter') { searchPlot(); }
-    });
+    function highlightThuaDat(layer) {
+        layer.setStyle({ color: '#ffff00', weight: 3.5, fillColor: '#ffff00', fillOpacity: 0.7 });
+        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+            layer.bringToFront();
+        }
+    }
 
     // =========================================================================
-    // 🔒 KHỐI XÁC THỰC TỰ ĐỘNG + TỔNG HỢP SIÊU NHẬN DIỆN THIẾT BỊ VÀO CỘT F
+    // 4. 🔒 KHỐI XÁC THỰC + SIÊU NHẬN DIỆN THIẾT BỊ VÀO CỘT F
     // =========================================================================
     var savedPhone = localStorage.getItem("sys_u_phone");
     var savedPass = localStorage.getItem("sys_u_pass");
 
-    // Nếu chưa nhập trên máy này -> Hỏi SĐT và Mật khẩu
+    // Nếu chưa lưu tài khoản trên trình duyệt này -> Yêu cầu nhập
     if (!savedPhone || !savedPass) {
         savedPhone = prompt("Vui lòng nhập Số điện thoại đã đăng ký:", "");
         savedPass = prompt("Vui lòng nhập Mật khẩu:", "");
@@ -335,18 +153,18 @@
         }
     }
 
-    // 1. Tạo hoặc lấy Device ID cố định cho thiết bị
+    // A. Khởi tạo hoặc lấy Hardware Device ID duy nhất trên thiết bị này
     var deviceId = localStorage.getItem("sys_device_id");
     if (!deviceId) {
         deviceId = "DEV_" + Math.random().toString(36).substr(2, 9).toUpperCase();
         localStorage.setItem("sys_device_id", deviceId);
     }
 
-    // 2. HÀM THU THẬP THÔNG TIN THIẾT BỊ (ĐÃ BỎ LANG)
+    // B. Hàm tổng hợp siêu thông tin thiết bị (Bỏ thông tin Lang)
     function getDetailedDeviceInfo() {
         var info = [];
 
-        // A. Hệ điều hành & Loại thiết bị
+        // 1. Hệ điều hành & Loại thiết bị (Mobile hay PC)
         var platform = navigator.platform || "N/A";
         if (navigator.userAgentData && navigator.userAgentData.platform) {
             platform = navigator.userAgentData.platform;
@@ -354,7 +172,7 @@
         var isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "Mobile" : "PC/Laptop";
         info.push(isMobile + " (" + platform + ")");
 
-        // B. Trình duyệt
+        // 2. Trình duyệt sử dụng
         var ua = navigator.userAgent;
         var browser = "Browser";
         if (ua.includes("Edg/")) browser = "Edge";
@@ -364,16 +182,16 @@
         else if (ua.includes("Zalo")) browser = "ZaloApp";
         info.push(browser);
 
-        // C. Độ phân giải màn hình & Tỉ lệ điểm ảnh (Retina/HD)
+        // 3. Độ phân giải màn hình & Tỉ lệ điểm ảnh
         var screenRes = window.screen.width + "x" + window.screen.height + " (" + window.devicePixelRatio + "x)";
         info.push("Màn: " + screenRes);
 
-        // D. Múi giờ
+        // 4. Múi giờ hệ thống
         var timeZone = "N/A";
         try { timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e){}
         info.push("TZ: " + timeZone);
 
-        // E. Lấy Card đồ họa (GPU)
+        // 5. Thông số Card đồ họa (GPU - Đầy đủ độ chi tiết phần cứng)
         try {
             var canvas = document.createElement("canvas");
             var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
@@ -392,13 +210,15 @@
 
     var fullDeviceInfo = getDetailedDeviceInfo();
 
-    // 3. Gửi yêu cầu xác thực tới Server
-    var requestUrl = webAppUrl + "?phone=" + encodeURIComponent(savedPhone || "") + "&pass=" + encodeURIComponent(savedPass || "");
+    // C. Gửi yêu cầu đăng nhập lên Server (Kèm theo device_id)
+    var requestUrl = webAppUrl + "?phone=" + encodeURIComponent(savedPhone || "") 
+                              + "&pass=" + encodeURIComponent(savedPass || "")
+                              + "&device_id=" + encodeURIComponent(deviceId || "");
 
     fetch(requestUrl)
         .then(response => response.json())
         .then(res => {
-            // Trường hợp: Sai SĐT/Pass HOẶC Tài khoản ở trạng thái "Khóa"
+            // Nếu bị Sai Mật khẩu / Tài khoản Bị Khóa / Đã Đăng nhập trên Máy khác -> Từ chối
             if (res.status === "error") {
                 alert(res.message);
                 localStorage.removeItem("sys_u_phone");
@@ -407,7 +227,7 @@
                 return;
             }
 
-            // 4. Ghi nhận thông tin thiết bị vào Cột F
+            // D. Đăng nhập thành công -> Tiến hành đồng bộ Chuỗi thông tin thiết bị vào Cột F
             fetch(webAppUrl, {
                 method: "POST",
                 mode: "no-cors",
@@ -418,24 +238,37 @@
                     device_info: fullDeviceInfo,
                     device_id: deviceId
                 })
-            }).catch(e => console.log("Lỗi ghi thiết bị:", e));
+            }).catch(e => console.log("Lỗi đồng bộ thiết bị:", e));
 
-            // 5. Vẽ toàn bộ thửa đất khi xác thực thành công
+            // E. Vẽ danh sách các thửa đất lên bản đồ
             var plots = res.plots || [];
             tatCaLayerThuaDat = []; 
+
             plots.forEach(function(item) {
                 if (!item.wkt) return;
                 var coords = wktToCoords(item.wkt);
                 var p = item.properties;
                 var mauSac = getMauTheoLoaiDat(p.loai_dat);
                 
-                var polygon = L.polygon(coords, { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 }).addTo(map);
-                polygon.options.originalStyle = { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 };
+                var polygon = L.polygon(coords, { 
+                    color: mauSac.color, 
+                    weight: 1.5, 
+                    fillColor: mauSac.fillColor, 
+                    fillOpacity: 0.45 
+                }).addTo(map);
+
+                polygon.options.originalStyle = { 
+                    color: mauSac.color, 
+                    weight: 1.5, 
+                    fillColor: mauSac.fillColor, 
+                    fillOpacity: 0.45 
+                };
                 polygon.customProperties = p; 
                 tatCaLayerThuaDat.push(polygon); 
 
                 var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
 
+                // Nội dung Bảng thông tin khi bấm vào thửa đất
                 var popupContent = "<table class='popup-table'>" +
                   "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
                   "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
@@ -462,7 +295,7 @@
                 xoaTatCaHighlightCu();
             });
         })
-        .catch(error => console.error('Hệ thống trục trặc:', error));
-</script>
+        .catch(error => console.error('Hệ thống gặp sự cố:', error));
+    </script>
 </body>
 </html>
