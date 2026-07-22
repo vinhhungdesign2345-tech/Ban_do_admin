@@ -303,146 +303,151 @@
     });
 
     // =========================================================================
-    // 4. HÀM TRÍCH XUẤT THÔNG TIN THIẾT BỊ TOÀN DIỆN (FULL DEVICE FINGERPRINT)
-    // =========================================================================
-    async function getFullDeviceFingerprint() {
-        var details = [];
-        details.push("UA: " + navigator.userAgent);
-        details.push("Lang: " + (navigator.languages ? navigator.languages.join(',') : navigator.language));
-        details.push("Screen: " + screen.width + "x" + screen.height + "x" + screen.colorDepth);
-        details.push("TZ: " + new Date().getTimezoneOffset());
-        details.push("CPU Cores: " + (navigator.hardwareConcurrency || 'N/A'));
-        details.push("RAM: " + (navigator.deviceMemory ? navigator.deviceMemory + 'GB' : 'N/A'));
-        details.push("TouchPoints: " + (navigator.maxTouchPoints || 0));
-
-        try {
-            var canvas = document.createElement('canvas');
-            var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-            if (gl) {
-                var debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                if (debugInfo) {
-                    var vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
-                    var renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-                    details.push("GPU: " + vendor + " | " + renderer);
-                }
-            }
-        } catch (e) {
-            details.push("GPU: Unknown");
-        }
-
-        try {
-            var cvs = document.createElement('canvas');
-            var ctx = cvs.getContext('2d');
-            ctx.textBaseline = "top";
-            ctx.font = "14px 'Arial'";
-            ctx.fillStyle = "#f60";
-            ctx.fillRect(125,1,62,20);
-            ctx.fillStyle = "#069";
-            ctx.fillText("Guland_Auth_v3", 2, 15);
-            var cvsData = cvs.toDataURL();
-            var hash = 0;
-            for (var i = 0; i < cvsData.length; i++) {
-                hash = ((hash << 5) - hash) + cvsData.charCodeAt(i);
-                hash |= 0;
-            }
-            details.push("CvsHash: " + Math.abs(hash));
-        } catch(e) {}
-
-        return details.join(" | ");
+// 1. HÀM NHẬN DIỆN LOẠI THIẾT BỊ (PC / Android / iPhone-iPad)
+// =========================================================================
+function getDeviceType() {
+    var ua = navigator.userAgent;
+    if (/android/i.test(ua)) {
+        return "Android";
     }
+    if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        return "Apple (iOS / iPadOS)";
+    }
+    if (/Macintosh|Mac OS X/.test(ua)) {
+        return "PC (macOS)";
+    }
+    if (/Windows/.test(ua)) {
+        return "PC (Windows)";
+    }
+    if (/Linux/.test(ua)) {
+        return "PC (Linux)";
+    }
+    return "Thiết bị khác";
+}
 
-    // =========================================================================
-    // 5. KHỐI XÁC THỰC BẢO MẬT VÀ TẢI DỮ LIỆU
-    // =========================================================================
-    async function khoiTaoHeThongBaoMat() {
-        var deviceDetails = await getFullDeviceFingerprint();
-
-        var userPhone = "";
-        var userPass = "";
-
-        var savedAdminPhone = localStorage.getItem("admin_phone");
-        var savedAdminPass = localStorage.getItem("admin_pass");
-
-        if (savedAdminPhone && savedAdminPass) {
-            userPhone = savedAdminPhone;
-            userPass = savedAdminPass;
-        } else {
-            userPhone = prompt("Vui lòng nhập SĐT đăng ký:", "");
-            userPass = prompt("Vui lòng nhập mật khẩu:", "");
-            userPhone = userPhone ? userPhone.trim() : "";
-            userPass = userPass ? userPass.trim() : "";
-        }
-
-        if (!userPhone || !userPass) {
-            alert("Bạn chưa nhập đầy đủ thông tin đăng nhập!");
-            document.getElementById("map").style.display = "none";
+// =========================================================================
+// 2. HÀM LẤY TỌA ĐỘ GPS CHÍNH XÁC CỦA THIẾT BỊ
+// =========================================================================
+function getExactLocation() {
+    return new Promise(function(resolve) {
+        if (!navigator.geolocation) {
+            resolve("Không hỗ trợ GPS");
             return;
         }
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                var lat = position.coords.latitude.toFixed(6);
+                var lng = position.coords.longitude.toFixed(6);
+                var accuracy = Math.round(position.coords.accuracy);
+                // Trả về định dạng: Tọa độ (Độ chính xác)
+                resolve(lat + ", " + lng + " (Sai số: " + accuracy + "m)");
+            },
+            function(error) {
+                resolve("Chưa bật/Chối từ GPS");
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    });
+}
 
-        var requestUrl = webAppUrl + "?phone=" + encodeURIComponent(userPhone) 
-                        + "&pass=" + encodeURIComponent(userPass) 
-                        + "&device_id=" + encodeURIComponent(deviceDetails);
+// =========================================================================
+// 🔒 KHỐI XÁC THỰC VÀ GỬI THÔNG TIN THIẾT BỊ + VỊ TRÍ
+// =========================================================================
+async function khoiTaoHeThongBaoMat() {
+    // Trích xuất 2 thông tin bạn yêu cầu
+    var deviceType = getDeviceType();
+    var locationStr = await getExactLocation();
+    
+    // Ghép thành chuỗi hiển thị gọn gàng
+    var fullInfo = "Thiết bị: " + deviceType + " | Vị trí: " + locationStr;
 
-        fetch(requestUrl)
-            .then(response => response.json())
-            .then(res => {
-                if (res.status === "error") {
-                    alert(res.message);
-                    localStorage.removeItem("admin_phone");
-                    localStorage.removeItem("admin_pass");
-                    document.getElementById("map").style.display = "none";
-                    return;
-                }
+    var userPhone = "";
+    var userPass = "";
 
-                if (res.role === "admin") {
-                    localStorage.setItem("admin_phone", userPhone);
-                    localStorage.setItem("admin_pass", userPass);
-                }
+    var savedAdminPhone = localStorage.getItem("admin_phone");
+    var savedAdminPass = localStorage.getItem("admin_pass");
 
-                var plots = res.plots || [];
-                tatCaLayerThuaDat = []; 
-                plots.forEach(function(item) {
-                    if (!item.wkt) return;
-                    var coords = wktToCoords(item.wkt);
-                    var p = item.properties;
-                    var mauSac = getMauTheoLoaiDat(p.loai_dat);
-                    
-                    var polygon = L.polygon(coords, { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 }).addTo(map);
-                    polygon.options.originalStyle = { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 };
-                    polygon.customProperties = p; 
-                    tatCaLayerThuaDat.push(polygon); 
-                    var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
-                    var popupContent = "<table class='popup-table'>" +
-                      "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
-                      "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
-                      "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + check(p.so_thua) + "</span></td></tr>" +
-                      "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(p.dien_tich) + "</td></tr>" +
-                      "<tr><td><b>Loại đất</b></td><td><span class='popup-value'><b>" + check(p.loai_dat) + "</b></span></td></tr>" +
-                      "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
-                      "<tr><td><b>Số định danh</b></td><td><span class='popup-value'>" + check(p.so_dinh_danh) + "</span></td></tr>" +
-                      "<tr><td><b>Trạng thái</b></td><td><span class='popup-value'>" + check(p.trang_thai) + "</span></td></tr>" +
-                      "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + check(p.ngay_tao) + "</span></td></tr>" +
-                      "<tr><td><b>Cập nhật</b></td><td><span class='popup-value'>" + check(p.ngay_cap_nhat) + "</span></td></tr>" +
-                      "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
-                      "</table>";
-                    polygon.bindPopup(popupContent, { maxWidth: 250 });
-                    polygon.on('click', function(e) {
-                        xoaTatCaHighlightCu();
-                        highlightThuaDat(polygon);
-                    });
-                });
-                map.on('popupclose', function() {
-                    xoaTatCaHighlightCu();
-                });
-            })
-            .catch(error => {
-                console.error('Lỗi kết nối Server:', error);
-                alert("Không thể kết nối đến máy chủ xác thực!");
-            });
+    if (savedAdminPhone && savedAdminPass) {
+        userPhone = savedAdminPhone;
+        userPass = savedAdminPass;
+    } else {
+        userPhone = prompt("Vui lòng nhập SĐT đăng ký:", "");
+        userPass = prompt("Vui lòng nhập mật khẩu:", "");
+        userPhone = userPhone ? userPhone.trim() : "";
+        userPass = userPass ? userPass.trim() : "";
     }
 
-    // Chạy kích hoạt bảo mật
-    khoiTaoHeThongBaoMat();
+    if (!userPhone || !userPass) {
+        alert("Bạn chưa nhập đầy đủ thông tin đăng nhập!");
+        document.getElementById("map").style.display = "none";
+        return;
+    }
+
+    // Gửi thông tin đăng nhập kèm Thông tin thiết bị & Vị trí lên Server
+    var requestUrl = webAppUrl + "?phone=" + encodeURIComponent(userPhone) 
+                    + "&pass=" + encodeURIComponent(userPass) 
+                    + "&device_id=" + encodeURIComponent(fullInfo);
+
+    fetch(requestUrl)
+        .then(response => response.json())
+        .then(res => {
+            if (res.status === "error") {
+                alert(res.message);
+                localStorage.removeItem("admin_phone");
+                localStorage.removeItem("admin_pass");
+                document.getElementById("map").style.display = "none";
+                return;
+            }
+
+            if (res.role === "admin") {
+                localStorage.setItem("admin_phone", userPhone);
+                localStorage.setItem("admin_pass", userPass);
+            }
+
+            // Vẽ dữ liệu bản đồ...
+            var plots = res.plots || [];
+            tatCaLayerThuaDat = []; 
+            plots.forEach(function(item) {
+                if (!item.wkt) return;
+                var coords = wktToCoords(item.wkt);
+                var p = item.properties;
+                var mauSac = getMauTheoLoaiDat(p.loai_dat);
+                
+                var polygon = L.polygon(coords, { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 }).addTo(map);
+                polygon.options.originalStyle = { color: mauSac.color, weight: 1.5, fillColor: mauSac.fillColor, fillOpacity: 0.45 };
+                polygon.customProperties = p; 
+                tatCaLayerThuaDat.push(polygon); 
+                var check = function(v) { return (v !== undefined && v !== null) ? v : ""; };
+                var popupContent = "<table class='popup-table'>" +
+                  "<tr><td><b>ID đất</b></td><td><span class='popup-value'>" + check(p.id_dat) + "</span></td></tr>" +
+                  "<tr><td><b>Số tờ</b></td><td><span class='popup-value'>" + check(p.so_to) + "</span></td></tr>" +
+                  "<tr><td><b>Số thửa</b></td><td><span class='popup-value'>" + check(p.so_thua) + "</span></td></tr>" +
+                  "<tr><td><b>Diện tích</b></td><td>" + formatDienTich(p.dien_tich) + "</td></tr>" +
+                  "<tr><td><b>Loại đất</b></td><td><span class='popup-value'><b>" + check(p.loai_dat) + "</b></span></td></tr>" +
+                  "<tr><td><b>Tên chủ</b></td><td><span class='popup-value' title='" + check(p.ten_chu) + "'>" + check(p.ten_chu) + "</span></td></tr>" +
+                  "<tr><td><b>Số định danh</b></td><td><span class='popup-value'>" + check(p.so_dinh_danh) + "</span></td></tr>" +
+                  "<tr><td><b>Trạng thái</b></td><td><span class='popup-value'>" + check(p.trang_thai) + "</span></td></tr>" +
+                  "<tr><td><b>Ngày tạo</b></td><td><span class='popup-value'>" + check(p.ngay_tao) + "</span></td></tr>" +
+                  "<tr><td><b>Cập nhật</b></td><td><span class='popup-value'>" + check(p.ngay_cap_nhat) + "</span></td></tr>" +
+                  "<tr><td><b>Ghi chú</b></td><td><span class='popup-value' title='" + check(p.ghi_chu) + "'>" + check(p.ghi_chu) + "</span></td></tr>" +
+                  "</table>";
+                polygon.bindPopup(popupContent, { maxWidth: 250 });
+                polygon.on('click', function(e) {
+                    xoaTatCaHighlightCu();
+                    highlightThuaDat(polygon);
+                });
+            });
+            map.on('popupclose', function() {
+                xoaTatCaHighlightCu();
+            });
+        })
+        .catch(error => {
+            console.error('Lỗi kết nối Server:', error);
+            alert("Không thể kết nối đến máy chủ xác thực!");
+        });
+}
+
+khoiTaoHeThongBaoMat();
 </script>
 </body>
 </html>
