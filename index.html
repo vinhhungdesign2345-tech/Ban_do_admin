@@ -15,7 +15,7 @@
         .popup-table tr:nth-child(even){background-color: #fafafa;}
         .popup-value { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         
-        /* CỤM THANH CÔNG CỤ TRÊN CÙNG GÓC TRÁI HỢP NHẤT */
+        /* CỤM THANH CÔNG CỤ TRÊN CÙNG GÓC TRÁI */
         .top-left-toolbar {
             position: absolute; top: 15px; left: 60px; z-index: 1000;
             display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
@@ -56,23 +56,22 @@
             cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
 
-        /* TÊN PHƯỜNG XÃ */
-        .ward-label-text {
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            font-weight: 800;
-            color: #0056b3;
-            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 6px #fff;
-            white-space: nowrap;
-            text-align: center;
-            transition: font-size 0.15s ease; /* Tạo hiệu ứng co giãn mượt mà */
+        /* ĐỊNH DẠNG CHỮ SVG HIỂN THỊ CHUẨN TỶ LỆ KHI ZOOM */
+        .svg-ward-label {
+            font-family: Arial, sans-serif;
+            font-weight: 900;
+            fill: #0056b3;
+            stroke: #ffffff;
+            stroke-width: 0.6px;
+            paint-order: stroke fill;
+            text-anchor: middle;
+            dominant-baseline: central;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
 
-<!-- KHUNG CÔNG CỤ HỢP NHẤT GÓC TRÁI -->
 <div class="top-left-toolbar">
     <div class="search-container">
         <input type="text" id="searchKey" class="search-input" placeholder="Tờ/thửa hoặc tên chủ...">
@@ -99,21 +98,48 @@
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
 
     // =========================================================================
-    // HÀM TỰ ĐỘNG THU NHỎ / PHÓNG TO CỠ CHỮ THEO ĐỘ ZOOM BẢN ĐỒ
+    // HÀM TẠO NHÃN CHỮ SVG CO GIÃN CHUẨN KÍCH THƯỚC NHƯ THỬA ĐẤT
     // =========================================================================
-    function updateWardLabelSize() {
-        var zoom = map.getZoom();
-        // Tính toán font size theo cấp độ zoom (ví dụ: zoom 11 -> 10px, zoom 15 -> 22px)
-        var fontSize = Math.max(9, Math.min(32, (zoom - 8) * 3)) + "px";
-        
-        var labels = document.querySelectorAll('.ward-label-text');
-        labels.forEach(function(el) {
-            el.style.fontSize = fontSize;
+    function createSvgLabel(centerLatLng, textString) {
+        var SvgLabelOverlay = L.Layer.extend({
+            onAdd: function(map) {
+                var pane = map.getPane('overlayPane');
+                this._container = L.DomUtil.create('div', 'leaflet-zoom-hide');
+                this._container.style.position = 'absolute';
+                this._container.style.pointerEvents = 'none';
+                
+                this._svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                this._svg.style.overflow = 'visible';
+                
+                this._text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                this._text.setAttribute('class', 'svg-ward-label');
+                this._text.textContent = textString;
+                
+                this._svg.appendChild(this._text);
+                this._container.appendChild(this._svg);
+                pane.appendChild(this._container);
+                
+                map.on('zoom zoomend viewreset move', this._update, this);
+                this._update();
+            },
+            onRemove: function(map) {
+                L.DomUtil.remove(this._container);
+                map.off('zoom zoomend viewreset move', this._update, this);
+            },
+            _update: function() {
+                var p = map.latLngToLayerPoint(centerLatLng);
+                L.DomUtil.setPosition(this._container, p);
+                
+                // Tự động tính toán kích thước font chữ chuẩn theo Zoom Level thực tế
+                var currentZoom = map.getZoom();
+                var baseFontSize = Math.pow(2, currentZoom - 13) * 16; // Co giãn theo cấp số nhân chuẩn bản đồ
+                
+                this._text.setAttribute('font-size', baseFontSize + 'px');
+            }
         });
-    }
 
-    // Lắng nghe sự kiện khi thao tác zoom bản đồ hoàn tất
-    map.on('zoomend', updateWardLabelSize);
+        return new SvgLabelOverlay();
+    }
 
 
     // =========================================================================
@@ -162,7 +188,6 @@
                 });
             }
         }
-        updateWardLabelSize(); // Cập nhật lại cỡ chữ sau khi lọc
     }
 
     function showAllWards() {
@@ -171,7 +196,6 @@
             layerNhomPhuong.addLayer(item.layer);
             allBounds.extend(item.layer.getBounds());
         });
-        updateWardLabelSize();
         return allBounds;
     }
 
@@ -207,15 +231,10 @@
             }).addTo(subGroup);
 
             var bounds = layerGeo.getBounds();
-            L.marker(bounds.getCenter(), {
-                icon: L.divIcon({
-                    className: 'ward-label-text',
-                    html: 'PHƯỜNG HÒA THÀNH',
-                    iconSize: [200, 30],
-                    iconAnchor: [100, 15]
-                }),
-                interactive: false
-            }).addTo(subGroup);
+            
+            // Vẽ tên Phường bằng công nghệ SVG co giãn chuẩn
+            var labelSvg = createSvgLabel(bounds.getCenter(), 'PHƯỜNG HÒA THÀNH');
+            labelSvg.addTo(subGroup);
 
             subGroup.getBounds = function() { return bounds; };
 
