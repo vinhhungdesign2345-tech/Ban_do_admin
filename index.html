@@ -187,7 +187,7 @@
         }
     }
 
-    fetch('hoa-thanh-2.geojson')
+    fetch('hoa-thanh.geojson')
         .then(response => response.json())
         .then(data => {
             var subGroup = L.layerGroup();
@@ -198,9 +198,9 @@
             var labelSvg = createSvgLabel(bounds.getCenter(), 'PHƯỜNG HÒA THÀNH');
             labelSvg.addTo(subGroup);
             subGroup.getBounds = function() { return bounds; };
-            addWardToList('hoa-thanh-2', 'Phường Hòa Thành', subGroup);
+            addWardToList('hoa-thanh', 'Phường Hòa Thành', subGroup);
         })
-        .catch(err => console.error("Chưa đọc được file hoa-thanh-2.geojson:", err));
+        .catch(err => console.error("Chưa đọc được file hoa-thanh.geojson:", err));
 
     // 3. XỬ LÝ ĐỊNH VỊ GPS VÀ TÌM KIẾM
     var userMarker, userCircle, currentLatLng = null;
