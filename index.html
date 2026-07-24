@@ -91,6 +91,19 @@
 <script>
     var webAppUrl = "https://script.google.com/macros/s/AKfycbyXKmoC9cWo0kITyguVpc-eTbp_imGagxzi4vpyKe9nOXiql63Vf-z_-hzUGKt_T1zR/exec";
     
+    // =========================================================================
+    // HƯỚNG DẪN THÊM PHƯỜNG/XÃ MỚI SAU NÀY:
+    // 1. Copy file GeoJSON mới bỏ cùng thư mục (Ví dụ: tan-thanh.geojson)
+    // 2. Bổ sung 1 dòng tương ứng vào danh sách DANH_SACH_PHUONG_XA bên dưới.
+    // =========================================================================
+    var DANH_SACH_PHUONG_XA = [
+        { id: 'hoa-thanh', name: 'Phường Hòa Thành', file: 'hoa-thanh.geojson' },
+        // --- THÊM PHƯỜNG MỚI TẠI ĐÂY ---
+        // Ví dụ:
+        // { id: 'tan-thanh', name: 'Phường Tân Thành', file: 'tan-thanh.geojson' },
+        // { id: 'phuong-1',  name: 'Phường 1',        file: 'phuong-1.geojson' }
+    ];
+
     // Hàm khóa/ẩn sạch giao diện người dùng
     function anGiaoDien() {
         document.getElementById("app-container").style.display = "none";
@@ -199,20 +212,33 @@
         }
     }
 
-    fetch('hoa-thanh.geojson')
-        .then(response => response.json())
-        .then(data => {
-            var subGroup = L.layerGroup();
-            var layerGeo = L.geoJSON(data, {
-                style: { color: "#007bff", weight: 3.5, opacity: 0.9, fillColor: "#007bff", fillOpacity: 0.05, interactive: false }
-            }).addTo(subGroup);
-            var bounds = layerGeo.getBounds();
-            var labelSvg = createSvgLabel(bounds.getCenter(), 'PHƯỜNG HÒA THÀNH');
-            labelSvg.addTo(subGroup);
-            subGroup.getBounds = function() { return bounds; };
-            addWardToList('hoa-thanh', 'Phường Hòa Thành', subGroup);
-        })
-        .catch(err => console.error("Chưa đọc được file hoa-thanh.geojson:", err));
+    // TỰ ĐỘNG TẢI TOÀN BỘ PHƯỜNG/XÃ TỪ CẤU HÌNH
+    function taiTatCaRanhGioiHanhChinh() {
+        DANH_SACH_PHUONG_XA.forEach(function(item) {
+            fetch(item.file)
+                .then(response => {
+                    if (!response.ok) throw new Error("Không nạp được file: " + item.file);
+                    return response.json();
+                })
+                .then(data => {
+                    var subGroup = L.layerGroup();
+                    var layerGeo = L.geoJSON(data, {
+                        style: { color: "#007bff", weight: 3.5, opacity: 0.9, fillColor: "#007bff", fillOpacity: 0.05, interactive: false }
+                    }).addTo(subGroup);
+                    
+                    var bounds = layerGeo.getBounds();
+                    var labelSvg = createSvgLabel(bounds.getCenter(), item.name.toUpperCase());
+                    labelSvg.addTo(subGroup);
+                    
+                    subGroup.getBounds = function() { return bounds; };
+                    addWardToList(item.id, item.name, subGroup);
+                })
+                .catch(err => console.error("Lỗi đọc file " + item.file + ":", err));
+        });
+    }
+
+    // Gọi hàm tự động nạp ranh giới Phường/Xã
+    taiTatCaRanhGioiHanhChinh();
 
     // 3. XỬ LÝ ĐỊNH VỊ GPS VÀ TÌM KIẾM
     var userMarker, userCircle, currentLatLng = null;
